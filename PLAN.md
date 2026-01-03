@@ -1979,12 +1979,28 @@ pnpm --filter @meals/core test
 
 ### Ticket: T018 Implement recipe CLI commands
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T018
 - **Scope:** list, show, add, delete, export commands
 - **Acceptance Criteria:** All commands work per Deliverable D spec
 - **Validation Steps:** Manual test each command, verify JSON output
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Implement recipe subcommands using RecipeService from core
+    - Key constraints: Support --json flag, format output nicely for terminal
+    - Dependencies: T009 (recipe service), T017 (CLI structure)
+    - Estimated complexity: moderate
+    - Reference: PLAN.md Deliverable D (Recipe Commands section)
+  - Agent-T018 implementation notes:
+    - Implemented all 5 recipe commands (list, show, add, delete, export)
+    - `recipe list`: Table output with ID (truncated), TITLE, TIME, CUISINE columns; --json for full output
+    - `recipe show`: Formatted terminal display with metadata, ingredients, instructions; --json for full object
+    - `recipe add`: --title and --instructions required; supports repeatable --ingredient (format "name:quantity unit") and --tag flags
+    - `recipe delete`: Confirmation prompt unless --force; shows success/failure message
+    - `recipe export`: Outputs markdown format to stdout or --output file
+    - All commands support global --json, --db flags via getGlobalOptions()
+    - Uses getDb({ dbPath }) + migrate() + RecipeService pattern
+    - `pnpm build` succeeds
 
 ### Ticket: T019 Implement plan CLI commands
 - **Priority:** P0
