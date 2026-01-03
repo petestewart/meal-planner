@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test": "node --import tsx tests/connection.test.ts && node --import tsx tests/migrate.test.ts && node --import tsx tests/models.test.ts && node --import tsx tests/recipe.repo.test.ts"
+    "test": "node --import tsx tests/connection.test.ts && node --import tsx tests/migrate.test.ts && node --import tsx tests/models.test.ts && node --import tsx tests/recipe.repo.test.ts && node --import tsx tests/recipe.service.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",

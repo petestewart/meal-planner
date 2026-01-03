@@ -1753,12 +1753,46 @@ pnpm --filter @meals/core test
 
 ### Ticket: T009 Implement recipe service
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T009
 - **Scope:** Business logic layer for recipes with audit logging
 - **Acceptance Criteria:** Service methods call repo, log to audit_log
 - **Validation Steps:** Unit tests mock repo, verify audit entries
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Create services/recipe.service.ts that wraps RecipeRepository
+    - Key constraints: All mutations must log to audit_log table, use AuditRepository
+    - Dependencies: T007 (recipe repo), T016 (audit repo - not done yet, may need to implement basic audit inline)
+    - Estimated complexity: moderate
+    - Actor types: 'user', 'cli', 'api', 'agent:curator', 'agent:planner'
+  - Agent-T009 implementation notes:
+    - Files created:
+      - packages/core/src/repos/audit.repo.ts: AuditRepository class with log(), getByEntityId(), getByEntityType(), getRecent() methods
+      - packages/core/src/services/recipe.service.ts: RecipeService class wrapping RecipeRepository with audit logging
+      - packages/core/src/services/index.ts: Re-exports RecipeService
+      - packages/core/tests/recipe.service.test.ts: 19 unit tests covering service behavior and audit logging
+    - RecipeService methods:
+      - createRecipe(data, ingredients?, tagIds?, actor?): Create recipe + audit log entry
+      - getRecipe(id): Read (no audit logging)
+      - listRecipes(options?): Read (no audit logging)
+      - updateRecipe(data, ingredients?, tagIds?, actor?): Update recipe + audit log entry (with details of what changed)
+      - deleteRecipe(id, actor?): Delete recipe + audit log entry (with title in details)
+      - recipeExists(id): Read (no audit logging)
+      - countRecipes(options?): Read (no audit logging)
+      - getRecipeAuditLog(recipeId): Get audit entries for a recipe
+    - Audit logging:
+      - All mutations (create, update, delete) log to audit_log table
+      - Default actor is 'user' when not specified
+      - Supports all actor types: 'user', 'cli', 'api', 'agent:curator', 'agent:planner'
+      - Details include relevant info (title, ingredient count, tag count, changed fields, etc.)
+      - Non-existent entities do not create audit entries (update/delete return null/false without logging)
+    - Updated exports:
+      - packages/core/src/repos/index.ts: Added AuditRepository and types
+      - packages/core/src/index.ts: Added AuditRepository exports and RecipeService export
+      - packages/core/package.json: Added recipe.service.test.ts to test script
+    - Validation results:
+      - `pnpm build`: SUCCESS - all packages compile without errors
+      - `pnpm test`: SUCCESS - 96/96 tests pass (8 connection + 13 migrate + 33 models + 23 recipe.repo + 19 recipe.service)
 
 ### Ticket: T010 Implement plan model and types
 - **Priority:** P0

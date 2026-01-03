@@ -56,4 +56,12 @@ export {
   RecipeRepository,
   type CreateRecipeIngredientInput,
   type ListRecipesOptions,
+  AuditRepository,
+  type AuditActor,
+  type AuditAction,
+  type CreateAuditLogEntry,
+  type AuditLogEntry,
 } from './repos/index.js';
+
+// Services
+export { RecipeService } from './services/index.js';
