@@ -1945,12 +1945,37 @@ pnpm --filter @meals/core test
 
 ### Ticket: T017 Create CLI entry point and structure
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T017
 - **Scope:** Set up commander with subcommands, --json flag, output helpers
 - **Acceptance Criteria:** `meals --help` shows all commands
 - **Validation Steps:** `pnpm --filter @meals/cli build && ./bin/meals --help`
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Install commander, create bin/meals.ts entry point, set up subcommand structure
+    - Key constraints: Support --json flag globally, create output.ts for formatting helpers
+    - Dependencies: T001-T002 (monorepo/TS setup)
+    - Estimated complexity: moderate
+    - Reference: PLAN.md Deliverable D (CLI Specification)
+  - Agent-T017 implementation notes:
+    - Installed commander ^14.0.0 in @meals/cli
+    - Files created:
+      - packages/cli/src/bin/meals.ts: Main entry point with global options (--json, --quiet, --verbose, --db)
+      - packages/cli/src/output.ts: Output helpers (printJson, printTable, printSuccess, printError, printInfo, printWarning, printDebug, getGlobalOptions)
+      - packages/cli/src/commands/recipe.ts: Recipe subcommand with list, show, add, import, delete, export
+      - packages/cli/src/commands/plan.ts: Plan subcommand with create, show, suggest, set, swap, activate, export
+      - packages/cli/src/commands/grocery.ts: Grocery subcommand with generate, export
+      - packages/cli/src/commands/prefs.ts: Prefs subcommand with show, set, clear
+      - packages/cli/src/commands/db.ts: DB subcommand with migrate, backup, stats
+      - packages/cli/src/commands/index.ts: Re-exports all commands
+    - All subcommands have placeholder implementations ("Not implemented yet")
+    - Global options: --json, --quiet, --verbose, --db <path>
+    - output.ts includes TableColumn interface and printTable for formatted table output
+    - Validation results:
+      - `pnpm --filter @meals/cli build`: SUCCESS
+      - `./packages/cli/dist/bin/meals.js --help`: Shows all 5 commands (recipe, plan, grocery, prefs, db)
+      - All subcommand --help works correctly
+      - Version flag works (0.1.0)
 
 ### Ticket: T018 Implement recipe CLI commands
 - **Priority:** P0

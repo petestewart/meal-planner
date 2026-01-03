@@ -29,6 +29,9 @@ importers:
       '@meals/core':
         specifier: workspace:*
         version: link:../core
+      commander:
+        specifier: ^14.0.2
+        version: 14.0.2
 
   packages/core:
     dependencies:
@@ -238,6 +241,10 @@ packages:
 
   chownr@1.1.4:
     resolution: {integrity: sha512-jJ0bqzaylmJtVnNgzTeSOs8DPavpbYgEr/b0YL8/2GO3xJEhInFmhKMUnEJQjZumK7KXGFhUy89PrsJWlakBVg==}
+
+  commander@14.0.2:
+    resolution: {integrity: sha512-TywoWNNRbhoD0BXs1P3ZEScW8W5iKrnbithIl0YH+uCmBd0QpPOA8yc82DS3BIE5Ma6FnBVUsJ7wVUDz4dvOWQ==}
+    engines: {node: '>=20'}
 
   decompress-response@6.0.0:
     resolution: {integrity: sha512-aW35yZM6Bb/4oJlZncMH2LCoZtJXTRxES17vE3hoRiowU2kWHaJKFkSBDnDR+cm9J+9QhXmREyIfv0pji9ejCQ==}
@@ -500,6 +507,8 @@ snapshots:
       ieee754: 1.2.1
 
   chownr@1.1.4: {}
+
+  commander@14.0.2: {}
 
   decompress-response@6.0.0:
     dependencies:

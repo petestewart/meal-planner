@@ -11,7 +11,7 @@
     "test": "echo 'No tests yet'"
   },
   "dependencies": {
-    "@meals/core": "workspace:*"
-  },
-  "devDependencies": {}
+    "@meals/core": "workspace:*",
+    "commander": "^14.0.2"
+  }
 }
