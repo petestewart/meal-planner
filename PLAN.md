@@ -1796,12 +1796,24 @@ pnpm --filter @meals/core test
 
 ### Ticket: T010 Implement plan model and types
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T010
 - **Scope:** Zod schemas for WeeklyPlan, PlanItem
 - **Acceptance Criteria:** Types exported, ISO week validation works
 - **Validation Steps:** Unit tests for week format validation
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Create models/plan.ts with Zod schemas matching DB
+    - Key constraints: ISO week format (YYYY-Www), day_of_week 1-7, meal_type enum
+    - Dependencies: T006 (recipe model pattern)
+    - Estimated complexity: simple
+  - Agent notes:
+    - Implementation complete: Created `/packages/core/src/models/plan.ts`
+    - Exported all types from `/packages/core/src/models/index.ts`
+    - Added 35 unit tests for plan schemas to `/packages/core/tests/models.test.ts`
+    - ISO week regex: `/^\d{4}-W(0[1-9]|[1-4]\d|5[0-3])$/`
+    - Helper function `isValidIsoWeek()` exported for convenience
+    - All tests pass (68 model tests total), `pnpm build` succeeds
 
 ### Ticket: T011 Implement plan repository
 - **Priority:** P0

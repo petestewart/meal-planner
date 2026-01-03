@@ -17,6 +17,17 @@ import {
   SourceTypeEnum,
   DifficultyEnum,
   RecipeWithRelationsSchema,
+  // Plan
+  IsoWeekSchema,
+  isValidIsoWeek,
+  PlanStatusEnum,
+  MealTypeEnum,
+  DayOfWeekSchema,
+  WeeklyPlanSchema,
+  CreateWeeklyPlanSchema,
+  PlanItemSchema,
+  CreatePlanItemSchema,
+  WeeklyPlanWithItemsSchema,
 } from '../src/models/index.js';
 
 // Test runner (simple, no dependencies)
@@ -591,6 +602,394 @@ test('Schema errors contain meaningful messages', () => {
     messages.some((m) => m.toLowerCase().includes('required') || m.toLowerCase().includes('at least')),
     'Error messages should be meaningful'
   );
+});
+
+// ==================
+// ISO Week Validation Tests
+// ==================
+
+test('IsoWeekSchema: valid ISO weeks pass validation', () => {
+  const validWeeks = ['2025-W01', '2025-W02', '2025-W52', '2024-W53', '2025-W09', '2025-W10', '2025-W49'];
+  for (const week of validWeeks) {
+    const result = IsoWeekSchema.safeParse(week);
+    assert(result.success, `ISO week '${week}' should be valid`);
+  }
+});
+
+test('IsoWeekSchema: rejects W00 (invalid week number)', () => {
+  const result = IsoWeekSchema.safeParse('2025-W00');
+  assert(!result.success, '2025-W00 should be invalid (week 00 does not exist)');
+});
+
+test('IsoWeekSchema: rejects W54 (invalid week number)', () => {
+  const result = IsoWeekSchema.safeParse('2025-W54');
+  assert(!result.success, '2025-W54 should be invalid (max is 53)');
+});
+
+test('IsoWeekSchema: rejects missing W prefix', () => {
+  const result = IsoWeekSchema.safeParse('2025-01');
+  assert(!result.success, '2025-01 should be invalid (missing W)');
+});
+
+test('IsoWeekSchema: rejects reversed format', () => {
+  const result = IsoWeekSchema.safeParse('W01-2025');
+  assert(!result.success, 'W01-2025 should be invalid (wrong order)');
+});
+
+test('IsoWeekSchema: rejects lowercase w', () => {
+  const result = IsoWeekSchema.safeParse('2025-w01');
+  assert(!result.success, '2025-w01 should be invalid (lowercase w)');
+});
+
+test('IsoWeekSchema: rejects single digit week', () => {
+  const result = IsoWeekSchema.safeParse('2025-W1');
+  assert(!result.success, '2025-W1 should be invalid (must be two digits)');
+});
+
+test('isValidIsoWeek: helper function validates correctly', () => {
+  assert(isValidIsoWeek('2025-W02'), '2025-W02 should be valid');
+  assert(isValidIsoWeek('2025-W53'), '2025-W53 should be valid');
+  assert(!isValidIsoWeek('2025-W00'), '2025-W00 should be invalid');
+  assert(!isValidIsoWeek('2025-W54'), '2025-W54 should be invalid');
+  assert(!isValidIsoWeek('invalid'), 'invalid should be invalid');
+  assert(!isValidIsoWeek(''), 'empty string should be invalid');
+});
+
+// ==================
+// Plan Status & Meal Type Tests
+// ==================
+
+test('PlanStatusEnum: validates correct statuses', () => {
+  const validStatuses = ['draft', 'active', 'completed'];
+  for (const status of validStatuses) {
+    const result = PlanStatusEnum.safeParse(status);
+    assert(result.success, `Status '${status}' should be valid`);
+  }
+});
+
+test('PlanStatusEnum: rejects invalid status', () => {
+  const result = PlanStatusEnum.safeParse('pending');
+  assert(!result.success, 'Invalid status should fail');
+});
+
+test('MealTypeEnum: validates correct meal types', () => {
+  const validTypes = ['breakfast', 'lunch', 'dinner'];
+  for (const type of validTypes) {
+    const result = MealTypeEnum.safeParse(type);
+    assert(result.success, `Meal type '${type}' should be valid`);
+  }
+});
+
+test('MealTypeEnum: rejects invalid meal type', () => {
+  const result = MealTypeEnum.safeParse('snack');
+  assert(!result.success, 'Invalid meal type should fail');
+});
+
+test('DayOfWeekSchema: validates days 1-7', () => {
+  for (let day = 1; day <= 7; day++) {
+    const result = DayOfWeekSchema.safeParse(day);
+    assert(result.success, `Day ${day} should be valid`);
+  }
+});
+
+test('DayOfWeekSchema: rejects day 0', () => {
+  const result = DayOfWeekSchema.safeParse(0);
+  assert(!result.success, 'Day 0 should be invalid');
+});
+
+test('DayOfWeekSchema: rejects day 8', () => {
+  const result = DayOfWeekSchema.safeParse(8);
+  assert(!result.success, 'Day 8 should be invalid');
+});
+
+test('DayOfWeekSchema: rejects non-integers', () => {
+  const result = DayOfWeekSchema.safeParse(1.5);
+  assert(!result.success, 'Non-integer day should be invalid');
+});
+
+// ==================
+// WeeklyPlan Tests
+// ==================
+
+test('WeeklyPlanSchema: valid weekly plan passes validation', () => {
+  const plan = {
+    id: 'plan-123',
+    week: '2025-W02',
+    status: 'draft',
+    notes: 'New year meal planning',
+    createdAt: '2025-01-03 10:00:00',
+    updatedAt: '2025-01-03 10:00:00',
+  };
+  const result = WeeklyPlanSchema.safeParse(plan);
+  assert(result.success, 'Valid weekly plan should pass validation');
+  assertEqual(result.data?.week, '2025-W02', 'Week should match');
+  assertEqual(result.data?.status, 'draft', 'Status should match');
+});
+
+test('WeeklyPlanSchema: plan with null notes passes', () => {
+  const plan = {
+    id: 'plan-123',
+    week: '2025-W02',
+    status: 'active',
+    notes: null,
+    createdAt: '2025-01-03T10:00:00Z',
+    updatedAt: '2025-01-03T10:00:00Z',
+  };
+  const result = WeeklyPlanSchema.safeParse(plan);
+  assert(result.success, 'Plan with null notes should pass');
+});
+
+test('WeeklyPlanSchema: invalid week format fails', () => {
+  const plan = {
+    id: 'plan-123',
+    week: '2025-01',
+    status: 'draft',
+    notes: null,
+    createdAt: '2025-01-03 10:00:00',
+    updatedAt: '2025-01-03 10:00:00',
+  };
+  const result = WeeklyPlanSchema.safeParse(plan);
+  assert(!result.success, 'Invalid week format should fail');
+});
+
+test('WeeklyPlanSchema: invalid status fails', () => {
+  const plan = {
+    id: 'plan-123',
+    week: '2025-W02',
+    status: 'pending',
+    notes: null,
+    createdAt: '2025-01-03 10:00:00',
+    updatedAt: '2025-01-03 10:00:00',
+  };
+  const result = WeeklyPlanSchema.safeParse(plan);
+  assert(!result.success, 'Invalid status should fail');
+});
+
+test('WeeklyPlanSchema: missing id fails', () => {
+  const plan = {
+    week: '2025-W02',
+    status: 'draft',
+    notes: null,
+    createdAt: '2025-01-03 10:00:00',
+    updatedAt: '2025-01-03 10:00:00',
+  };
+  const result = WeeklyPlanSchema.safeParse(plan);
+  assert(!result.success, 'Missing id should fail');
+});
+
+test('CreateWeeklyPlanSchema: creates plan without id and timestamps', () => {
+  const createData = {
+    week: '2025-W02',
+    status: 'draft',
+    notes: 'Test plan',
+  };
+  const result = CreateWeeklyPlanSchema.safeParse(createData);
+  assert(result.success, 'CreateWeeklyPlan should work without id and timestamps');
+  assertEqual(result.data?.week, '2025-W02', 'Week should match');
+});
+
+test('CreateWeeklyPlanSchema: status defaults to draft', () => {
+  const createData = {
+    week: '2025-W02',
+    notes: null,
+  };
+  const result = CreateWeeklyPlanSchema.safeParse(createData);
+  assert(result.success, 'CreateWeeklyPlan should work with default status');
+  assertEqual(result.data?.status, 'draft', 'Status should default to draft');
+});
+
+// ==================
+// PlanItem Tests
+// ==================
+
+test('PlanItemSchema: valid plan item passes validation', () => {
+  const planItem = {
+    id: 'item-123',
+    planId: 'plan-456',
+    recipeId: 'recipe-789',
+    dayOfWeek: 1,
+    mealType: 'dinner',
+    servings: 4,
+    notes: 'Double the sauce',
+  };
+  const result = PlanItemSchema.safeParse(planItem);
+  assert(result.success, 'Valid plan item should pass validation');
+  assertEqual(result.data?.dayOfWeek, 1, 'Day of week should be 1 (Monday)');
+  assertEqual(result.data?.mealType, 'dinner', 'Meal type should match');
+});
+
+test('PlanItemSchema: plan item with null recipeId passes', () => {
+  const planItem = {
+    id: 'item-123',
+    planId: 'plan-456',
+    recipeId: null,
+    dayOfWeek: 3,
+    mealType: 'lunch',
+    servings: 2,
+    notes: 'Eating out',
+  };
+  const result = PlanItemSchema.safeParse(planItem);
+  assert(result.success, 'Plan item with null recipeId should pass');
+});
+
+test('PlanItemSchema: plan item with null notes passes', () => {
+  const planItem = {
+    id: 'item-123',
+    planId: 'plan-456',
+    recipeId: 'recipe-789',
+    dayOfWeek: 7,
+    mealType: 'breakfast',
+    servings: 2,
+    notes: null,
+  };
+  const result = PlanItemSchema.safeParse(planItem);
+  assert(result.success, 'Plan item with null notes should pass');
+});
+
+test('PlanItemSchema: invalid dayOfWeek fails', () => {
+  const planItem = {
+    id: 'item-123',
+    planId: 'plan-456',
+    recipeId: 'recipe-789',
+    dayOfWeek: 8,
+    mealType: 'dinner',
+    servings: 2,
+    notes: null,
+  };
+  const result = PlanItemSchema.safeParse(planItem);
+  assert(!result.success, 'Invalid day of week should fail');
+});
+
+test('PlanItemSchema: invalid mealType fails', () => {
+  const planItem = {
+    id: 'item-123',
+    planId: 'plan-456',
+    recipeId: 'recipe-789',
+    dayOfWeek: 1,
+    mealType: 'brunch',
+    servings: 2,
+    notes: null,
+  };
+  const result = PlanItemSchema.safeParse(planItem);
+  assert(!result.success, 'Invalid meal type should fail');
+});
+
+test('PlanItemSchema: negative servings fails', () => {
+  const planItem = {
+    id: 'item-123',
+    planId: 'plan-456',
+    recipeId: 'recipe-789',
+    dayOfWeek: 1,
+    mealType: 'dinner',
+    servings: -1,
+    notes: null,
+  };
+  const result = PlanItemSchema.safeParse(planItem);
+  assert(!result.success, 'Negative servings should fail');
+});
+
+test('PlanItemSchema: zero servings fails', () => {
+  const planItem = {
+    id: 'item-123',
+    planId: 'plan-456',
+    recipeId: 'recipe-789',
+    dayOfWeek: 1,
+    mealType: 'dinner',
+    servings: 0,
+    notes: null,
+  };
+  const result = PlanItemSchema.safeParse(planItem);
+  assert(!result.success, 'Zero servings should fail');
+});
+
+test('PlanItemSchema: missing planId fails', () => {
+  const planItem = {
+    id: 'item-123',
+    recipeId: 'recipe-789',
+    dayOfWeek: 1,
+    mealType: 'dinner',
+    servings: 2,
+    notes: null,
+  };
+  const result = PlanItemSchema.safeParse(planItem);
+  assert(!result.success, 'Missing planId should fail');
+});
+
+test('CreatePlanItemSchema: creates plan item without id', () => {
+  const createData = {
+    planId: 'plan-456',
+    recipeId: 'recipe-789',
+    dayOfWeek: 1,
+    mealType: 'dinner',
+    servings: 4,
+    notes: null,
+  };
+  const result = CreatePlanItemSchema.safeParse(createData);
+  assert(result.success, 'CreatePlanItem should work without id');
+});
+
+test('CreatePlanItemSchema: servings defaults to 2', () => {
+  const createData = {
+    planId: 'plan-456',
+    recipeId: 'recipe-789',
+    dayOfWeek: 1,
+    mealType: 'dinner',
+    notes: null,
+  };
+  const result = CreatePlanItemSchema.safeParse(createData);
+  assert(result.success, 'CreatePlanItem should work with default servings');
+  assertEqual(result.data?.servings, 2, 'Servings should default to 2');
+});
+
+// ==================
+// WeeklyPlanWithItems Tests
+// ==================
+
+test('WeeklyPlanWithItemsSchema: plan with items array passes', () => {
+  const plan = {
+    id: 'plan-123',
+    week: '2025-W02',
+    status: 'active',
+    notes: null,
+    createdAt: '2025-01-03 10:00:00',
+    updatedAt: '2025-01-03 10:00:00',
+    items: [
+      {
+        id: 'item-1',
+        planId: 'plan-123',
+        recipeId: 'recipe-1',
+        dayOfWeek: 1,
+        mealType: 'dinner',
+        servings: 4,
+        notes: null,
+      },
+      {
+        id: 'item-2',
+        planId: 'plan-123',
+        recipeId: 'recipe-2',
+        dayOfWeek: 2,
+        mealType: 'lunch',
+        servings: 2,
+        notes: 'Leftover night',
+      },
+    ],
+  };
+  const result = WeeklyPlanWithItemsSchema.safeParse(plan);
+  assert(result.success, 'Plan with items should pass');
+  assertEqual(result.data?.items?.length, 2, 'Should have 2 items');
+});
+
+test('WeeklyPlanWithItemsSchema: plan without items passes', () => {
+  const plan = {
+    id: 'plan-123',
+    week: '2025-W02',
+    status: 'draft',
+    notes: null,
+    createdAt: '2025-01-03 10:00:00',
+    updatedAt: '2025-01-03 10:00:00',
+  };
+  const result = WeeklyPlanWithItemsSchema.safeParse(plan);
+  assert(result.success, 'Plan without items should pass (optional array)');
 });
 
 // Run all tests
