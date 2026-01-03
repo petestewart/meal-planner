@@ -1,0 +1,17 @@
+{
+  "name": "@meals/api",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "clean": "rm -rf dist",
+    "test": "echo 'No tests yet'"
+  },
+  "dependencies": {
+    "@meals/core": "workspace:*"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@meals/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "meals": "./dist/bin/meals.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "echo 'No tests yet'"
+  },
+  "dependencies": {
+    "@meals/core": "workspace:*"
+  },
+  "devDependencies": {}
+}
