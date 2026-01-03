@@ -300,6 +300,171 @@ test('getAppliedMigrations returns applied migrations in order', () => {
   }
 });
 
+test('001_initial.sql creates all required tables', () => {
+  const db = getDb({ dbPath: ':memory:' });
+  const migrationsDir = join(import.meta.dirname, '..', 'src', 'db', 'migrations');
+
+  try {
+    const applied = migrate(db, migrationsDir);
+    assert(applied >= 1, 'should apply at least 1 migration');
+
+    // Expected tables from Deliverable B
+    const expectedTables = [
+      'recipes',
+      'ingredients',
+      'recipe_ingredients',
+      'tags',
+      'recipe_tags',
+      'weekly_plans',
+      'plan_items',
+      'pantry_items',
+      'preferences',
+      'audit_log',
+    ];
+
+    // Get all tables
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .all() as Array<{ name: string }>;
+    const tableNames = tables.map((t) => t.name);
+
+    for (const table of expectedTables) {
+      assert(tableNames.includes(table), `table '${table}' should exist`);
+    }
+  } finally {
+    closeDb(db);
+  }
+});
+
+test('001_initial.sql creates all required indexes', () => {
+  const db = getDb({ dbPath: ':memory:' });
+  const migrationsDir = join(import.meta.dirname, '..', 'src', 'db', 'migrations');
+
+  try {
+    migrate(db, migrationsDir);
+
+    // Expected indexes
+    const expectedIndexes = [
+      'idx_recipes_title',
+      'idx_recipes_cuisine',
+      'idx_recipe_ingredients_recipe',
+      'idx_recipe_ingredients_ingredient',
+      'idx_recipe_tags_recipe',
+      'idx_recipe_tags_tag',
+      'idx_plan_items_plan',
+      'idx_plan_items_recipe',
+      'idx_audit_log_timestamp',
+      'idx_audit_log_actor',
+      'idx_audit_log_entity',
+    ];
+
+    // Get all indexes
+    const indexes = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='index' ORDER BY name")
+      .all() as Array<{ name: string }>;
+    const indexNames = indexes.map((i) => i.name);
+
+    for (const index of expectedIndexes) {
+      assert(indexNames.includes(index), `index '${index}' should exist`);
+    }
+  } finally {
+    closeDb(db);
+  }
+});
+
+test('001_initial.sql creates FTS5 virtual table', () => {
+  const db = getDb({ dbPath: ':memory:' });
+  const migrationsDir = join(import.meta.dirname, '..', 'src', 'db', 'migrations');
+
+  try {
+    migrate(db, migrationsDir);
+
+    // Check for FTS5 virtual table
+    const ftsTable = db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='recipes_fts'"
+      )
+      .get();
+
+    assert(ftsTable !== undefined, 'recipes_fts virtual table should exist');
+  } finally {
+    closeDb(db);
+  }
+});
+
+test('001_initial.sql creates FTS triggers', () => {
+  const db = getDb({ dbPath: ':memory:' });
+  const migrationsDir = join(import.meta.dirname, '..', 'src', 'db', 'migrations');
+
+  try {
+    migrate(db, migrationsDir);
+
+    // Expected triggers
+    const expectedTriggers = ['recipes_ai', 'recipes_ad', 'recipes_au'];
+
+    // Get all triggers
+    const triggers = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='trigger' ORDER BY name")
+      .all() as Array<{ name: string }>;
+    const triggerNames = triggers.map((t) => t.name);
+
+    for (const trigger of expectedTriggers) {
+      assert(triggerNames.includes(trigger), `trigger '${trigger}' should exist`);
+    }
+  } finally {
+    closeDb(db);
+  }
+});
+
+test('FTS triggers work correctly for insert, update, delete', () => {
+  const db = getDb({ dbPath: ':memory:' });
+  const migrationsDir = join(import.meta.dirname, '..', 'src', 'db', 'migrations');
+
+  try {
+    migrate(db, migrationsDir);
+
+    // Insert a recipe
+    db.prepare(
+      `INSERT INTO recipes (id, title, description, instructions)
+       VALUES ('test-1', 'Spaghetti Carbonara', 'Classic Italian pasta dish', 'Cook pasta, add egg mixture')`
+    ).run();
+
+    // Search for it via FTS
+    const searchResult = db
+      .prepare("SELECT * FROM recipes_fts WHERE recipes_fts MATCH 'carbonara'")
+      .all() as Array<{ title: string }>;
+    assertEqual(searchResult.length, 1, 'should find 1 result after insert');
+
+    // Update the recipe
+    db.prepare(
+      "UPDATE recipes SET title = 'Updated Carbonara' WHERE id = 'test-1'"
+    ).run();
+
+    // Search for updated title
+    const updatedResult = db
+      .prepare("SELECT * FROM recipes_fts WHERE recipes_fts MATCH 'updated'")
+      .all() as Array<{ title: string }>;
+    assertEqual(updatedResult.length, 1, 'should find 1 result after update');
+
+    // Old search should not find it
+    const oldSearch = db
+      .prepare("SELECT * FROM recipes_fts WHERE recipes_fts MATCH 'spaghetti'")
+      .all();
+    assertEqual(oldSearch.length, 0, 'should not find old title after update');
+
+    // Delete the recipe
+    db.prepare("DELETE FROM recipes WHERE id = 'test-1'").run();
+
+    // FTS should be empty
+    const afterDelete = db
+      .prepare("SELECT * FROM recipes_fts WHERE recipes_fts MATCH 'carbonara'")
+      .all();
+    assertEqual(afterDelete.length, 0, 'should not find result after delete');
+  } finally {
+    closeDb(db);
+  }
+});
+
 // Run all tests
 console.log('Running migration system tests...');
 console.log('');

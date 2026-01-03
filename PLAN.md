@@ -1655,12 +1655,25 @@ pnpm --filter @meals/core test
 
 ### Ticket: T005 Create initial schema migration
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T005
 - **Scope:** Write 001_initial.sql with all tables, indexes, FTS
 - **Acceptance Criteria:** All tables from Deliverable B exist after migration
 - **Validation Steps:** `meals db migrate` then `.schema` in sqlite3 shows all tables
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Create 001_initial.sql with full schema from PLAN.md Deliverable B (lines 256-398)
+    - Key constraints: Must include all tables (recipes, ingredients, recipe_ingredients, tags, recipe_tags, weekly_plans, plan_items, pantry_items, preferences, audit_log), indexes, and FTS5 triggers
+    - Dependencies: T004 (done)
+    - Estimated complexity: moderate (large SQL file)
+    - Note: Replace the test 001_test.sql with actual 001_initial.sql
+  - Agent-T005 notes:
+    - COMPLETE: Deleted 001_test.sql and created 001_initial.sql with full schema
+    - All 10 tables created: recipes, ingredients, recipe_ingredients, tags, recipe_tags, weekly_plans, plan_items, pantry_items, preferences, audit_log
+    - All 11 indexes created: idx_recipes_title, idx_recipes_cuisine, idx_recipe_ingredients_recipe, idx_recipe_ingredients_ingredient, idx_recipe_tags_recipe, idx_recipe_tags_tag, idx_plan_items_plan, idx_plan_items_recipe, idx_audit_log_timestamp, idx_audit_log_actor, idx_audit_log_entity
+    - FTS5 virtual table recipes_fts created with triggers: recipes_ai, recipes_ad, recipes_au
+    - Added 6 new tests to migrate.test.ts verifying all tables, indexes, FTS, and trigger functionality
+    - All tests pass (13 passed), build passes
 
 ### Ticket: T006 Implement recipe model and types
 - **Priority:** P0
