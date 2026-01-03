@@ -13,14 +13,16 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test": "node --import tsx tests/connection.test.ts && node --import tsx tests/migrate.test.ts && node --import tsx tests/models.test.ts"
+    "test": "node --import tsx tests/connection.test.ts && node --import tsx tests/migrate.test.ts && node --import tsx tests/models.test.ts && node --import tsx tests/recipe.repo.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",
+    "uuid": "^13.0.0",
     "zod": "^4.3.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/uuid": "^11.0.0",
     "tsx": "^4.21.0"
   }
 }

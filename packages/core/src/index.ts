@@ -50,3 +50,10 @@ export {
   type UpdateRecipe,
   type RecipeWithRelations,
 } from './models/index.js';
+
+// Repositories
+export {
+  RecipeRepository,
+  type CreateRecipeIngredientInput,
+  type ListRecipesOptions,
+} from './repos/index.js';

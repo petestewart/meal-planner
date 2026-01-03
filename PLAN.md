@@ -1709,12 +1709,38 @@ pnpm --filter @meals/core test
 
 ### Ticket: T007 Implement recipe repository
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T007
 - **Scope:** CRUD operations for recipes with ingredients and tags
 - **Acceptance Criteria:** Can create, read, update, delete recipes with relations
 - **Validation Steps:** Integration tests against in-memory SQLite
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Create repos/recipe.repo.ts with CRUD methods using raw SQL
+    - Key constraints: No ORM, parameterized queries only, handle relations (ingredients, tags)
+    - Dependencies: T005 (schema), T006 (types)
+    - Estimated complexity: moderate-high
+    - Must handle: recipe_ingredients junction, recipe_tags junction
+  - Agent-T007 implementation notes:
+    - Installed uuid ^13.0.0 and @types/uuid ^11.0.0 in @meals/core
+    - Files created:
+      - packages/core/src/repos/recipe.repo.ts: RecipeRepository class with full CRUD
+      - packages/core/src/repos/index.ts: Re-exports RecipeRepository and types
+      - packages/core/tests/recipe.repo.test.ts: 23 integration tests
+    - RecipeRepository methods:
+      - create(data, ingredients?, tagIds?): Create recipe with optional relations
+      - getById(id): Get recipe with ingredients and tags
+      - list(options?): List recipes with filters (cuisine, difficulty, tagIds, search, limit, offset)
+      - update(data, ingredients?, tagIds?): Update recipe, optionally replace relations
+      - delete(id): Delete recipe (CASCADE handles relations)
+      - exists(id): Check if recipe exists
+      - count(options?): Count recipes with optional filters
+    - Handles recipe_ingredients and recipe_tags junctions correctly
+    - Uses transactions for create/update with relations
+    - All raw SQL with parameterized queries (no ORM)
+    - Validation results:
+      - `pnpm build`: SUCCESS - all packages compile without errors
+      - `pnpm test`: SUCCESS - 77/77 tests pass (8 connection + 13 migrate + 33 models + 23 recipe.repo)
 
 ### Ticket: T008 Implement recipe search with FTS
 - **Priority:** P1
