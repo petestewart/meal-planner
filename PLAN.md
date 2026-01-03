@@ -1588,12 +1588,34 @@ pnpm --filter @meals/core test
 
 ### Ticket: T003 Set up SQLite connection
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T003
 - **Scope:** Create database connection module in core with better-sqlite3
 - **Acceptance Criteria:** Can open/close database, handle missing file gracefully
 - **Validation Steps:** Unit test creates temp db, runs query, closes
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Install better-sqlite3 in core package, create db/connection.ts with getDb() function
+    - Key constraints: Sync API (better-sqlite3 is synchronous), handle db file creation if missing
+    - Dependencies: T001 (done), T002 (done)
+    - Estimated complexity: simple
+  - Agent-T003 implementation notes:
+    - Installed better-sqlite3 ^12.5.0 and @types/better-sqlite3 ^7.6.13 in @meals/core
+    - Created packages/core/src/db/connection.ts with:
+      - getDb(options): Opens/returns database connection, creates file and parent dirs if missing
+      - closeDb(db?): Closes database connection
+      - isDbOpen(): Checks if singleton connection is open
+      - Singleton pattern for default path (data/meals.db)
+      - WAL mode enabled for file-based databases
+      - Foreign keys enabled
+    - Exported from packages/core/src/index.ts
+    - Created tests/connection.test.ts with 8 passing tests
+    - Added tsx ^4.21.0 for running TypeScript tests
+    - Updated root package.json to allow better-sqlite3 and esbuild builds
+    - Validation results:
+      * Unit tests: 8/8 PASS (temp db creation, queries, WAL mode, foreign keys, etc.)
+      * better-sqlite3 installed: VERIFIED in @meals/core dependencies
+      * pnpm build: SUCCESS - all 4 packages compile without errors
 
 ### Ticket: T004 Implement migration system
 - **Priority:** P0
