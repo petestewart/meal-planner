@@ -1619,12 +1619,39 @@ pnpm --filter @meals/core test
 
 ### Ticket: T004 Implement migration system
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T004
 - **Scope:** Create migrate.ts and schema_migrations table tracking
 - **Acceptance Criteria:** Migrations run in order, skip already-applied, transactional
 - **Validation Steps:** Run migrate twice, second run does nothing
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Create db/migrate.ts per PLAN.md spec (section 5, Migration Strategy)
+    - Key constraints: Read SQL files from migrations/ dir, track in schema_migrations table, transactional
+    - Dependencies: T003 (done)
+    - Estimated complexity: moderate
+    - Reference: See PLAN.md lines 400-446 for migrate.ts implementation example
+  - Agent-T004 implementation notes:
+    - Created packages/core/src/db/migrate.ts with:
+      - migrate(db, migrationsDir): Main function - runs pending migrations in order
+      - getAppliedMigrations(db): Returns list of applied migrations with timestamps
+      - getDefaultMigrationsDir(): Returns path to default migrations directory
+    - Created packages/core/src/db/migrations/ directory
+    - Created 001_test.sql test migration (creates test_table)
+    - Exported migrate, getAppliedMigrations, getDefaultMigrationsDir from index.ts
+    - Created tests/migrate.test.ts with 8 passing tests covering:
+      - Creates schema_migrations table
+      - Applies migrations in order (sorted by filename)
+      - Skips already-applied migrations (second run does nothing)
+      - Transactional rollback on failure
+      - Handles missing migrations directory gracefully
+      - Skips files without version number prefix
+      - getAppliedMigrations returns empty array when table doesn't exist
+      - getAppliedMigrations returns migrations in order with timestamps
+    - Validation results:
+      * `pnpm build`: SUCCESS - all 4 packages compile without TypeScript errors
+      * Migration tests: 8/8 PASS
+      * Connection tests: 8/8 PASS (no regressions)
 
 ### Ticket: T005 Create initial schema migration
 - **Priority:** P0
