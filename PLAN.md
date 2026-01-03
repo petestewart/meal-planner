@@ -1539,7 +1539,7 @@ pnpm --filter @meals/core test
 
 ### Ticket: T001 Initialize monorepo structure
 - **Priority:** P0
-- **Status:** In Progress
+- **Status:** Done
 - **Owner:** Agent-T001
 - **Scope:** Create pnpm workspace with package.json files for root, core, api, cli, agent-tools
 - **Acceptance Criteria:** `pnpm install` works, packages can import each other
@@ -1562,12 +1562,29 @@ pnpm --filter @meals/core test
 
 ### Ticket: T002 Configure TypeScript
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T002
 - **Scope:** Create tsconfig.base.json and per-package tsconfig.json with strict mode
 - **Acceptance Criteria:** TypeScript compiles all packages, path aliases work
 - **Validation Steps:** `pnpm build` produces dist/ in each package
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: T001 already created basic tsconfig files. Verify strict mode is enabled and add path aliases if needed for cross-package imports.
+    - Key constraints: Must use ESM (type: module), strict mode required
+    - Dependencies: T001 (done)
+    - Estimated complexity: simple
+    - Note: Basic tsconfig files already exist from T001 - enhance them if needed, verify they meet acceptance criteria
+  - Agent-T002 implementation notes:
+    - Reviewed existing TypeScript configuration created by T001
+    - tsconfig.base.json already has strict: true enabled
+    - All packages use ESM (module: NodeNext, moduleResolution: NodeNext)
+    - Added @meals/core imports to api, cli, and agent-tools to validate cross-package imports
+    - Validation results:
+      * `pnpm build`: SUCCESS - all 4 packages compiled (core, api, cli, agent-tools)
+      * dist/ directories created in all packages with .js, .d.ts, .d.ts.map, .js.map files
+      * Strict mode: VERIFIED - "strict": true in tsconfig.base.json
+      * Cross-package imports: VERIFIED - all packages successfully import and re-export from @meals/core at runtime
+      * Runtime test: node import of each package's dist/index.js shows coreVersion from @meals/core
 
 ### Ticket: T003 Set up SQLite connection
 - **Priority:** P0
