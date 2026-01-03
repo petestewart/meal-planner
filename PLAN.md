@@ -1677,12 +1677,35 @@ pnpm --filter @meals/core test
 
 ### Ticket: T006 Implement recipe model and types
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T006
 - **Scope:** Create Zod schemas for Recipe, Ingredient, RecipeIngredient, Tag
 - **Acceptance Criteria:** Types exported from @meals/core, validation works
 - **Validation Steps:** Unit tests for schema validation pass/fail cases
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Create models/ directory with Zod schemas matching DB schema
+    - Key constraints: Use Zod for runtime validation, export inferred types
+    - Dependencies: T005 (done) - schema defines the data model
+    - Estimated complexity: moderate
+    - Files to create: models/recipe.ts, models/ingredient.ts, models/tag.ts, models/index.ts
+  - Agent-T006 notes:
+    - COMPLETE: All Zod schemas created and exported from @meals/core
+    - Installed zod ^4.3.4 in @meals/core
+    - Files created:
+      - packages/core/src/models/ingredient.ts: IngredientSchema, CreateIngredientSchema, UpdateIngredientSchema
+      - packages/core/src/models/tag.ts: TagSchema, TagCategoryEnum, RecipeTagSchema, CreateTagSchema, UpdateTagSchema
+      - packages/core/src/models/recipe.ts: RecipeSchema, RecipeIngredientSchema, SourceTypeEnum, DifficultyEnum, CreateRecipeSchema, UpdateRecipeSchema, CreateRecipeIngredientSchema, RecipeWithRelationsSchema
+      - packages/core/src/models/index.ts: Re-exports all schemas and types
+    - All schemas include:
+      - Runtime validation with meaningful error messages
+      - Nullable optional fields (matching DB schema)
+      - Enum constraints matching CHECK constraints in SQL
+      - Create/Update variants where appropriate
+    - tests/models.test.ts: 33 tests covering pass/fail validation cases
+    - Validation results:
+      - `pnpm --filter @meals/core test`: 54/54 PASS (8 connection + 13 migrate + 33 models)
+      - `pnpm --filter @meals/core build`: SUCCESS - all .d.ts and .js files generated
 
 ### Ticket: T007 Implement recipe repository
 - **Priority:** P0

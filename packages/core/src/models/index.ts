@@ -1,27 +1,17 @@
-// @meals/core - Domain logic and repositories
-export const version = '0.1.0';
+// Re-export all model schemas and types
 
-// Database connection
-export { getDb, closeDb, isDbOpen } from './db/connection.js';
-export type { Database, DbOptions } from './db/connection.js';
-
-// Database migrations
+// Ingredient models
 export {
-  migrate,
-  getAppliedMigrations,
-  getDefaultMigrationsDir,
-} from './db/migrate.js';
-
-// Models - Zod schemas and TypeScript types
-export {
-  // Ingredient
   IngredientSchema,
   CreateIngredientSchema,
   UpdateIngredientSchema,
   type Ingredient,
   type CreateIngredient,
   type UpdateIngredient,
-  // Tag
+} from './ingredient.js';
+
+// Tag models
+export {
   TagCategoryEnum,
   TagSchema,
   CreateTagSchema,
@@ -32,7 +22,10 @@ export {
   type CreateTag,
   type UpdateTag,
   type RecipeTag,
-  // Recipe
+} from './tag.js';
+
+// Recipe models
+export {
   SourceTypeEnum,
   DifficultyEnum,
   RecipeIngredientSchema,
@@ -49,4 +42,4 @@ export {
   type CreateRecipe,
   type UpdateRecipe,
   type RecipeWithRelations,
-} from './models/index.js';
+} from './recipe.js';
