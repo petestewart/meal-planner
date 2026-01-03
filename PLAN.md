@@ -1864,12 +1864,48 @@ pnpm --filter @meals/core test
 
 ### Ticket: T012 Implement plan service
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T012
 - **Scope:** Business logic for plans, meal assignment, status transitions
 - **Acceptance Criteria:** Service enforces rules (unique meal per slot, valid status)
 - **Validation Steps:** Unit tests for business rules
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Create services/plan.service.ts wrapping PlanRepository
+    - Key constraints: Audit logging for mutations, status transition rules, validate recipe exists
+    - Dependencies: T009 (recipe service pattern), T011 (plan repo)
+    - Estimated complexity: moderate
+  - Agent-T012 implementation notes:
+    - Files created:
+      - packages/core/src/services/plan.service.ts: PlanService class wrapping PlanRepository with audit logging
+      - packages/core/tests/plan.service.test.ts: 27 unit tests covering all service methods and business rules
+    - PlanService methods:
+      - createPlan(data, actor?): Create plan + audit log entry
+      - getPlan(id): Read (no audit logging)
+      - getPlanByWeek(week): Read (no audit logging)
+      - listPlans(options?): Read (no audit logging)
+      - updatePlan(data, actor?): Update plan + audit log entry
+      - deletePlan(id, actor?): Delete plan + audit log entry (logs week, status, itemCount)
+      - setStatus(id, status, actor?): Change status + audit log entry (logs from/to status)
+      - setMeal(planId, dayOfWeek, mealType, recipeId, servings?, notes?, actor?): Set meal + audit log entry
+      - removeMeal(planId, dayOfWeek, mealType, actor?): Remove meal + audit log entry
+      - planExists(id): Check if plan exists (no audit)
+      - countPlans(options?): Count plans (no audit)
+      - getPlanAuditLog(planId): Get audit entries for plan
+    - Business rules enforced:
+      - Validates recipe exists before assigning to meal slot (throws error if not found)
+      - Allows null recipeId for meal slots without assigned recipes
+      - Returns null for operations on non-existent plans (no audit log created)
+      - Status transitions: All transitions allowed (draft/active/completed in any direction) - PLAN.md did not specify restrictions
+      - Default actor is 'user' when not specified
+      - Supports all actor types: 'user', 'cli', 'api', 'agent:curator', 'agent:planner'
+    - Updated exports:
+      - packages/core/src/services/index.ts: Added PlanService export
+      - packages/core/src/index.ts: Added PlanService to services export
+      - packages/core/package.json: Added plan.service.test.ts to test script
+    - Validation results:
+      - `pnpm build`: SUCCESS - all 4 packages compile without TypeScript errors
+      - `pnpm test`: SUCCESS - 194/194 tests pass (8 connection + 13 migrate + 68 models + 23 recipe.repo + 19 recipe.service + 36 plan.repo + 27 plan.service)
 
 ### Ticket: T013 Implement meal suggestion algorithm
 - **Priority:** P1

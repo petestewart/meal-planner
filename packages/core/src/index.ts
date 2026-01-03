@@ -91,4 +91,4 @@ export {
 } from './repos/index.js';
 
 // Services
-export { RecipeService } from './services/index.js';
+export { RecipeService, PlanService } from './services/index.js';
