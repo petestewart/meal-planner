@@ -2004,12 +2004,29 @@ pnpm --filter @meals/core test
 
 ### Ticket: T019 Implement plan CLI commands
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T019
 - **Scope:** create, show, suggest, set, swap, activate, export commands
 - **Acceptance Criteria:** All commands work per Deliverable D spec
 - **Validation Steps:** Manual test plan workflow end-to-end
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Implement plan subcommands using PlanService from core
+    - Key constraints: Support --json flag, handle ISO week format, show meals in table
+    - Dependencies: T012 (plan service), T017 (CLI structure)
+    - Estimated complexity: moderate
+    - Note: suggest/swap commands are P1 (meal suggestion algorithm), can be placeholders for now
+  - Implementation notes (Agent-T019):
+    - All plan commands implemented in packages/cli/src/commands/plan.ts
+    - Helper functions: parseWeek (this-week/next-week/YYYY-Wnn), parseDay (mon-sun), parseMealType (breakfast/lunch/dinner), getIsoWeek
+    - create: Creates draft plan, checks for existing plan first
+    - show: Displays table with recipe titles, falls back to active plan or this-week if no week specified
+    - set: Auto-creates plan if needed, validates recipe exists, supports --servings and --notes
+    - activate: Changes plan status to active
+    - export: Generates markdown with table format, supports --output flag
+    - suggest/swap: Placeholders printing "Meal suggestion feature coming soon"
+    - All commands support --json flag and global --db option
+    - Build succeeds (pnpm build)
 
 ### Ticket: T020 Implement grocery and prefs CLI commands
 - **Priority:** P1
