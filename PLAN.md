@@ -1817,12 +1817,50 @@ pnpm --filter @meals/core test
 
 ### Ticket: T011 Implement plan repository
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T011
 - **Scope:** CRUD for weekly plans and plan items
 - **Acceptance Criteria:** Can create plan, add/update/remove meals
 - **Validation Steps:** Integration tests for plan lifecycle
 - **Notes:**
+  - Orchestrator notes:
+    - Intended approach: Create repos/plan.repo.ts with CRUD for plans and items
+    - Key constraints: Handle plan items as nested operations, unique constraint on (plan_id, day_of_week, meal_type)
+    - Dependencies: T007 (recipe repo pattern), T010 (plan types)
+    - Estimated complexity: moderate
+  - Agent-T011 implementation notes:
+    - Files created:
+      - packages/core/src/repos/plan.repo.ts: PlanRepository class with full CRUD for plans and items
+      - packages/core/tests/plan.repo.test.ts: 36 integration tests
+    - PlanRepository methods for WeeklyPlan:
+      - create(data): Create weekly plan with week, status, notes
+      - getById(id): Get plan by ID with items
+      - getByWeek(week): Get plan by ISO week string with items
+      - list(options?): List plans with optional status filter, limit, offset (ordered by week DESC)
+      - update(data): Update plan fields (week, status, notes)
+      - delete(id): Delete plan (CASCADE handles items)
+      - setStatus(id, status): Change plan status
+      - exists(id): Check if plan exists
+      - count(options?): Count plans with optional status filter
+    - PlanRepository methods for PlanItems:
+      - setMeal(planId, dayOfWeek, mealType, recipeId, servings?, notes?): Set/update meal (UPSERT behavior via INSERT OR REPLACE)
+      - removeMeal(planId, dayOfWeek, mealType): Remove meal from plan
+      - getMeals(planId): Get all meals for a plan (ordered by day, then meal type)
+      - getMealBySlot(planId, dayOfWeek, mealType): Get specific meal by slot
+      - getMealById(id): Get meal by ID
+    - Features:
+      - Unique constraint on (plan_id, day_of_week, meal_type) handled via UPSERT
+      - setMeal preserves existing item ID when updating (for stable references)
+      - getMeals returns items ordered: day ASC, then breakfast/lunch/dinner
+      - All get/list methods include items array
+      - Cascade delete from weekly_plans to plan_items verified
+    - Updated exports:
+      - packages/core/src/repos/index.ts: Added PlanRepository and ListPlansOptions
+      - packages/core/src/index.ts: Added PlanRepository, ListPlansOptions, and all plan model exports
+      - packages/core/package.json: Added plan.repo.test.ts to test script
+    - Validation results:
+      - `pnpm build`: SUCCESS - all packages compile without TypeScript errors
+      - `pnpm test`: SUCCESS - 131/131 tests pass (8 connection + 13 migrate + 68 models + 23 recipe.repo + 19 recipe.service + 36 plan.repo)
 
 ### Ticket: T012 Implement plan service
 - **Priority:** P0

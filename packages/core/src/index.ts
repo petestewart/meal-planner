@@ -49,6 +49,31 @@ export {
   type CreateRecipe,
   type UpdateRecipe,
   type RecipeWithRelations,
+  // Plan
+  ISO_WEEK_REGEX,
+  IsoWeekSchema,
+  isValidIsoWeek,
+  PlanStatusEnum,
+  MealTypeEnum,
+  DayOfWeekSchema,
+  WeeklyPlanSchema,
+  CreateWeeklyPlanSchema,
+  UpdateWeeklyPlanSchema,
+  PlanItemSchema,
+  CreatePlanItemSchema,
+  UpdatePlanItemSchema,
+  WeeklyPlanWithItemsSchema,
+  type IsoWeek,
+  type PlanStatus,
+  type MealType,
+  type DayOfWeek,
+  type WeeklyPlan,
+  type CreateWeeklyPlan,
+  type UpdateWeeklyPlan,
+  type PlanItem,
+  type CreatePlanItem,
+  type UpdatePlanItem,
+  type WeeklyPlanWithItems,
 } from './models/index.js';
 
 // Repositories
@@ -61,6 +86,8 @@ export {
   type AuditAction,
   type CreateAuditLogEntry,
   type AuditLogEntry,
+  PlanRepository,
+  type ListPlansOptions,
 } from './repos/index.js';
 
 // Services

@@ -13,3 +13,8 @@ export {
   type CreateAuditLogEntry,
   type AuditLogEntry,
 } from './audit.repo.js';
+
+export {
+  PlanRepository,
+  type ListPlansOptions,
+} from './plan.repo.js';
