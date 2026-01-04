@@ -335,7 +335,7 @@ function displayPersistentGroceryList(list: PersistentGroceryList): void {
 groceryCommand
   .command('generate [week]')
   .description('Generate and persist grocery list for a week (week format: YYYY-Wnn, this-week, or next-week)')
-  .option('--include-pantry', 'Include items already in pantry')
+  .option('--exclude-pantry', 'Exclude items already in pantry (subtract pantry quantities)')
   .option('--group-by <method>', 'Group by: category, recipe, or aisle', 'category')
   .action((week: string | undefined, options, command) => {
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
@@ -358,8 +358,10 @@ groceryCommand
         targetWeek = currentWeek;
       }
 
-      // Use the new generateAndPersist method
-      const list = groceryService.generateAndPersist(targetWeek);
+      // Use the new generateAndPersist method with excludePantry option
+      const list = groceryService.generateAndPersist(targetWeek, {
+        excludePantry: options.excludePantry ?? false,
+      });
 
       if (!list) {
         printError(`No plan found for week ${targetWeek}`);
@@ -369,7 +371,8 @@ groceryCommand
       if (globalOpts.json) {
         printJson(list);
       } else {
-        printSuccess(`Generated grocery list for ${targetWeek}`);
+        const pantryNote = options.excludePantry ? ' (excluding pantry items)' : '';
+        printSuccess(`Generated grocery list for ${targetWeek}${pantryNote}`);
         displayPersistentGroceryList(list);
       }
     } catch (error) {

@@ -10,7 +10,14 @@ export {
   type GroceryListItemWithStatus,
   type PersistentGroceryList,
   type CheckPantryResult,
+  type GenerateListOptions,
 } from './grocery.service.js';
+
+export {
+  PantryService,
+  type AddPantryItemInput,
+  type AddPantryItemResult,
+} from './pantry.service.js';
 export { PreferenceService } from './preference.service.js';
 export {
   ImportService,

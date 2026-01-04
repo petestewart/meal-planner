@@ -9,6 +9,7 @@
 import type { Database } from 'better-sqlite3';
 import { PlanRepository } from '../repos/plan.repo.js';
 import { RecipeRepository } from '../repos/recipe.repo.js';
+import { PantryRepository } from '../repos/pantry.repo.js';
 import {
   GroceryListRepository,
   type PersistedGroceryListWithItems,
@@ -237,10 +238,19 @@ export interface CheckPantryResult {
   warning?: string;
 }
 
+/**
+ * Options for generating a grocery list
+ */
+export interface GenerateListOptions {
+  /** Exclude items that are in the pantry (subtract quantities) */
+  excludePantry?: boolean;
+}
+
 export class GroceryService {
   private planRepo: PlanRepository;
   private recipeRepo: RecipeRepository;
   private groceryListRepo: GroceryListRepository;
+  private pantryRepo: PantryRepository;
   private db: Database;
 
   constructor(db: Database) {
@@ -248,15 +258,17 @@ export class GroceryService {
     this.planRepo = new PlanRepository(db);
     this.recipeRepo = new RecipeRepository(db);
     this.groceryListRepo = new GroceryListRepository(db);
+    this.pantryRepo = new PantryRepository(db);
   }
 
   /**
    * Generate a grocery list for a week or plan ID.
    *
    * @param weekOrPlanId - ISO week string (e.g., "2025-W02") or plan ID
+   * @param options - Generation options
    * @returns Structured grocery list grouped by category
    */
-  generateList(weekOrPlanId: string): GroceryList | null {
+  generateList(weekOrPlanId: string, options?: GenerateListOptions): GroceryList | null {
     // Try to get plan by week first, then by ID
     let plan: WeeklyPlanWithItems | null = null;
 
@@ -301,6 +313,11 @@ export class GroceryService {
       }
     }
 
+    // If excludePantry is set, subtract pantry quantities
+    if (options?.excludePantry) {
+      this.subtractPantryItems(aggregations);
+    }
+
     // Build grouped grocery list
     const groups = this.buildGroups(aggregations);
 
@@ -309,6 +326,39 @@ export class GroceryService {
       groups,
       generatedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Subtract pantry item quantities from aggregations.
+   * Removes items completely if pantry has enough quantity.
+   */
+  private subtractPantryItems(aggregations: Map<string, IngredientAggregation>): void {
+    const pantryQuantities = this.pantryRepo.getPantryQuantities();
+
+    for (const [ingredientId, agg] of aggregations) {
+      const pantryItem = pantryQuantities.get(ingredientId);
+      if (!pantryItem) continue;
+
+      // For each unit in the aggregation, try to subtract pantry quantity
+      // This is simplified - assumes same units or no conversion
+      for (const [unit, neededQty] of agg.quantitiesByUnit.entries()) {
+        // Check if pantry has this ingredient
+        const pantryQty = pantryItem.quantity;
+
+        if (pantryQty >= neededQty) {
+          // Pantry has enough - remove from grocery list
+          agg.quantitiesByUnit.delete(unit);
+        } else {
+          // Pantry has some - reduce needed quantity
+          agg.quantitiesByUnit.set(unit, neededQty - pantryQty);
+        }
+      }
+
+      // If no quantities left, mark for removal
+      if (agg.quantitiesByUnit.size === 0) {
+        aggregations.delete(ingredientId);
+      }
+    }
   }
 
   /**
@@ -446,28 +496,30 @@ export class GroceryService {
    * Generate a grocery list for a specific week.
    *
    * @param week - ISO week string (e.g., "2025-W02")
+   * @param options - Generation options
    * @returns Structured grocery list grouped by category
    */
-  generateListForWeek(week: string): GroceryList | null {
+  generateListForWeek(week: string, options?: GenerateListOptions): GroceryList | null {
     const plan = this.planRepo.getByWeek(week);
     if (!plan) {
       return null;
     }
-    return this.generateList(plan.id);
+    return this.generateList(plan.id, options);
   }
 
   /**
    * Generate a grocery list for a specific plan ID.
    *
    * @param planId - Plan ID
+   * @param options - Generation options
    * @returns Structured grocery list grouped by category
    */
-  generateListForPlan(planId: string): GroceryList | null {
+  generateListForPlan(planId: string, options?: GenerateListOptions): GroceryList | null {
     const plan = this.planRepo.getById(planId);
     if (!plan) {
       return null;
     }
-    return this.generateList(plan.id);
+    return this.generateList(plan.id, options);
   }
 
   // ============================================
@@ -479,11 +531,12 @@ export class GroceryService {
    * This creates/updates the persistent list while preserving manual items.
    *
    * @param week - ISO week string (e.g., "2025-W02")
+   * @param options - Generation options
    * @returns Persistent grocery list with items and status counts
    */
-  generateAndPersist(week: string): PersistentGroceryList | null {
+  generateAndPersist(week: string, options?: GenerateListOptions): PersistentGroceryList | null {
     // Generate the grocery list from the meal plan
-    const generatedList = this.generateListForWeek(week);
+    const generatedList = this.generateListForWeek(week, options);
     if (!generatedList) {
       return null;
     }
@@ -777,10 +830,11 @@ export class GroceryService {
 
   /**
    * Bulk-mark items from pantry.
-   * Note: This is a stub implementation as pantry integration (T031) is not complete.
+   * Checks grocery list items against pantry inventory and marks items
+   * as "already_have" or "partial" based on pantry quantities.
    *
    * @param week - ISO week string
-   * @returns Result with warning about incomplete feature
+   * @returns Result with counts of checked and marked items
    */
   checkPantry(week: string): CheckPantryResult {
     const list = this.groceryListRepo.getByWeek(week);
@@ -793,19 +847,37 @@ export class GroceryService {
       };
     }
 
-    // Stub implementation - pantry integration not yet complete
-    // When T031 is complete, this will:
-    // 1. Query pantry_items table
-    // 2. Match against grocery list items by ingredient_id
-    // 3. Mark matches as already_have or partial based on quantities
+    // Get pantry quantities
+    const pantryQuantities = this.pantryRepo.getPantryQuantities();
+
+    let itemsMarked = 0;
+
+    // Check each grocery item against pantry
+    for (const item of list.items) {
+      // Skip items that don't have an ingredient ID
+      if (!item.ingredientId) continue;
+
+      const pantryItem = pantryQuantities.get(item.ingredientId);
+      if (!pantryItem) continue;
+
+      const neededQty = item.quantity ?? 0;
+      const pantryQty = pantryItem.quantity;
+
+      if (pantryQty >= neededQty) {
+        // Have enough - mark as already_have
+        this.groceryListRepo.markAsHave(item.id);
+        itemsMarked++;
+      } else if (pantryQty > 0) {
+        // Have some - mark as partial
+        this.groceryListRepo.markAsPartial(item.id, pantryQty);
+        itemsMarked++;
+      }
+    }
 
     return {
       week,
       itemsChecked: list.items.length,
-      itemsMarked: 0,
-      warning:
-        'Pantry integration is not yet implemented (depends on T031). ' +
-        'Use "grocery check <item>" to manually mark items you already have.',
+      itemsMarked,
     };
   }
 

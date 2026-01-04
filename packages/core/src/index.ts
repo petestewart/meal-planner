@@ -102,6 +102,19 @@ export {
   type AllergyEntry,
   type CuisinePreferences,
   type PrepDay,
+  // Pantry models (T031)
+  PantryLocationEnum,
+  PantryItemSchema,
+  PantryItemWithIngredientSchema,
+  CreatePantryItemSchema,
+  UpdatePantryItemSchema,
+  PANTRY_LOCATIONS,
+  isValidPantryLocation,
+  type PantryLocation,
+  type PantryItem,
+  type PantryItemWithIngredient,
+  type CreatePantryItem,
+  type UpdatePantryItem,
 } from './models/index.js';
 
 // Repositories
@@ -130,6 +143,9 @@ export {
   type PersistedGroceryListWithItems,
   type CreateGroceryItemInput,
   type UpdateGroceryItemInput,
+  // Pantry repository (T031)
+  PantryRepository,
+  type ListPantryItemsOptions,
 } from './repos/index.js';
 
 // Re-export GroceryItemStatus type from repos
@@ -146,6 +162,11 @@ export {
   type GroceryListItemWithStatus,
   type PersistentGroceryList,
   type CheckPantryResult,
+  type GenerateListOptions,
+  // Pantry service (T031)
+  PantryService,
+  type AddPantryItemInput,
+  type AddPantryItemResult,
   PreferenceService,
   ImportService,
   type ImportedRecipeData,

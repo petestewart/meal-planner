@@ -2342,8 +2342,8 @@ pnpm --filter @meals/core test
 
 ### Ticket: T031 Implement pantry service and CLI
 - **Priority:** P2
-- **Status:** Pending
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T031
 - **Scope:** Track pantry items (raw and prepared) and subtract from grocery lists
 - **Acceptance Criteria:**
   - `meals pantry list` - show current pantry items
@@ -2358,7 +2358,13 @@ pnpm --filter @meals/core test
   - `meals pantry expiring` - show items expiring within 7 days
 - **Validation Steps:** Add pantry items (raw and prepared), generate grocery list with exclusion
 - **Notes:**
-  - Dependencies: T014 (grocery service - done)
+  - Orchestrator notes:
+    - Intended approach: The pantry_items table already exists from 001_initial.sql. Create 005_pantry_enhancements.sql migration to add is_prepared, preparation_notes, location, is_staple columns. Create PantryService. Create pantry CLI commands. Update grocery service to support --exclude-pantry. Also connect to the check-pantry stub in T045.
+    - Key constraints: Use ingredient_id to link to ingredients table. Location enum: fridge, freezer, pantry. Expiration dates stored as ISO date strings.
+    - Dependencies: T014 (grocery service - done), T045 (grocery persistence - done)
+    - Estimated complexity: high
+  - Original notes:
+    - Dependencies: T014 (grocery service - done)
   - Schema enhancement needed for pantry_items table:
     ```sql
     ALTER TABLE pantry_items ADD COLUMN is_prepared BOOLEAN DEFAULT FALSE;
@@ -2367,6 +2373,17 @@ pnpm --filter @meals/core test
     ALTER TABLE pantry_items ADD COLUMN is_staple BOOLEAN DEFAULT FALSE;
     ```
   - Prepared items useful for meal prep (e.g., "4 sous vide chicken breasts")
+  - **Agent-T031 Implementation Notes:**
+    - Created migration 005_pantry_enhancements.sql with columns: is_prepared, preparation_notes, location, is_staple
+    - Created PantryItem model at packages/core/src/models/pantry.ts with Zod schemas for validation
+    - Created PantryRepository at packages/core/src/repos/pantry.repo.ts with full CRUD operations
+    - Created PantryService at packages/core/src/services/pantry.service.ts for business logic
+    - Created pantry CLI commands at packages/cli/src/commands/pantry.ts: list, add, remove, use, expiring, update
+    - Updated GroceryService with excludePantry option for generateList/generateAndPersist methods
+    - Updated GroceryService.checkPantry() to properly query pantry and mark grocery items
+    - Updated grocery CLI generate command with --exclude-pantry flag
+    - Exported all new types and classes from core and CLI index files
+    - All validation steps passed: pnpm build, pnpm test, all CLI commands work correctly
 
 ### Ticket: T032 Implement audit log viewing
 - **Priority:** P3

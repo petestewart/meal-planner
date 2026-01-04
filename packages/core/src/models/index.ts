@@ -102,3 +102,19 @@ export {
   type CuisinePreferences,
   type PrepDay,
 } from './preference.js';
+
+// Pantry models
+export {
+  PantryLocationEnum,
+  PantryItemSchema,
+  PantryItemWithIngredientSchema,
+  CreatePantryItemSchema,
+  UpdatePantryItemSchema,
+  PANTRY_LOCATIONS,
+  isValidPantryLocation,
+  type PantryLocation,
+  type PantryItem,
+  type PantryItemWithIngredient,
+  type CreatePantryItem,
+  type UpdatePantryItem,
+} from './pantry.js';

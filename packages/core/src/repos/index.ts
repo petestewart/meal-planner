@@ -44,3 +44,8 @@ export {
   type CreateGroceryItemInput,
   type UpdateGroceryItemInput,
 } from './grocery-list.repo.js';
+
+export {
+  PantryRepository,
+  type ListPantryItemsOptions,
+} from './pantry.repo.js';

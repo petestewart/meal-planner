@@ -7,6 +7,7 @@ import { groceryCommand } from '../commands/grocery.js';
 import { prefsCommand } from '../commands/prefs.js';
 import { dbCommand } from '../commands/db.js';
 import { ingredientCommand } from '../commands/ingredient.js';
+import { pantryCommand } from '../commands/pantry.js';
 
 const program = new Command();
 
@@ -26,5 +27,6 @@ program.addCommand(groceryCommand);
 program.addCommand(prefsCommand);
 program.addCommand(dbCommand);
 program.addCommand(ingredientCommand);
+program.addCommand(pantryCommand);
 
 program.parse();
