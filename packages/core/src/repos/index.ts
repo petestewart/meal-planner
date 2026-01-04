@@ -27,7 +27,13 @@ export {
 
 export { TagRepository } from './tag.repo.js';
 
-export { IngredientRepository } from './ingredient.repo.js';
+export {
+  IngredientRepository,
+  INGREDIENT_CATEGORIES,
+  getAutoCategory,
+  isValidCategory,
+  type IngredientCategory,
+} from './ingredient.repo.js';
 
 export {
   GroceryListRepository,

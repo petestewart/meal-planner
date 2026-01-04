@@ -6,6 +6,7 @@ import { planCommand } from '../commands/plan.js';
 import { groceryCommand } from '../commands/grocery.js';
 import { prefsCommand } from '../commands/prefs.js';
 import { dbCommand } from '../commands/db.js';
+import { ingredientCommand } from '../commands/ingredient.js';
 
 const program = new Command();
 
@@ -24,5 +25,6 @@ program.addCommand(planCommand);
 program.addCommand(groceryCommand);
 program.addCommand(prefsCommand);
 program.addCommand(dbCommand);
+program.addCommand(ingredientCommand);
 
 program.parse();

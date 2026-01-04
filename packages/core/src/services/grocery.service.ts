@@ -207,6 +207,8 @@ export interface GroceryListItemWithStatus {
   isManual: boolean;
   recipes: string[];
   ingredientId: string | null;
+  /** Category of the ingredient (looked up from ingredients table) */
+  category: string | null;
 }
 
 /**
@@ -548,17 +550,29 @@ export class GroceryService {
       week: list.week,
       generatedAt: list.generatedAt,
       updatedAt: list.updatedAt,
-      items: list.items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        status: item.status,
-        haveQuantity: item.haveQuantity,
-        isManual: item.isManual,
-        recipes: item.recipes,
-        ingredientId: item.ingredientId,
-      })),
+      items: list.items.map((item) => {
+        // Look up category from ingredients table if we have an ingredient ID
+        let category: string | null = null;
+        if (item.ingredientId) {
+          const ingredientRow = this.db
+            .prepare('SELECT category FROM ingredients WHERE id = ?')
+            .get(item.ingredientId) as { category: string | null } | undefined;
+          category = ingredientRow?.category ?? null;
+        }
+
+        return {
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          status: item.status,
+          haveQuantity: item.haveQuantity,
+          isManual: item.isManual,
+          recipes: item.recipes,
+          ingredientId: item.ingredientId,
+          category,
+        };
+      }),
       counts,
     };
   }
@@ -608,6 +622,15 @@ export class GroceryService {
    * Convert internal item to public format
    */
   private convertItemToPublic(item: PersistedGroceryItem): GroceryListItemWithStatus {
+    // Look up category from ingredients table if we have an ingredient ID
+    let category: string | null = null;
+    if (item.ingredientId) {
+      const ingredientRow = this.db
+        .prepare('SELECT category FROM ingredients WHERE id = ?')
+        .get(item.ingredientId) as { category: string | null } | undefined;
+      category = ingredientRow?.category ?? null;
+    }
+
     return {
       id: item.id,
       name: item.name,
@@ -618,6 +641,7 @@ export class GroceryService {
       isManual: item.isManual,
       recipes: item.recipes,
       ingredientId: item.ingredientId,
+      category,
     };
   }
 

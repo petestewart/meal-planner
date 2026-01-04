@@ -251,6 +251,61 @@ function formatItemQuantity(item: GroceryListItemWithStatus): string {
 }
 
 /**
+ * Group items by category, sorted alphabetically with Uncategorized last
+ */
+function groupByCategory(items: GroceryListItemWithStatus[]): Map<string, GroceryListItemWithStatus[]> {
+  const byCategory = new Map<string, GroceryListItemWithStatus[]>();
+
+  for (const item of items) {
+    const category = (item as { category?: string | null }).category || 'Uncategorized';
+    if (!byCategory.has(category)) {
+      byCategory.set(category, []);
+    }
+    byCategory.get(category)!.push(item);
+  }
+
+  // Sort categories alphabetically with Uncategorized last
+  const sortedCategories = Array.from(byCategory.keys()).sort((a, b) => {
+    if (a === 'Uncategorized') return 1;
+    if (b === 'Uncategorized') return -1;
+    return a.localeCompare(b);
+  });
+
+  const sortedMap = new Map<string, GroceryListItemWithStatus[]>();
+  for (const cat of sortedCategories) {
+    // Sort items within category by name
+    const catItems = byCategory.get(cat)!;
+    catItems.sort((a, b) => a.name.localeCompare(b.name));
+    sortedMap.set(cat, catItems);
+  }
+
+  return sortedMap;
+}
+
+/**
+ * Display items grouped by category
+ */
+function displayItemsByCategory(items: GroceryListItemWithStatus[], sectionTitle: string): void {
+  if (items.length === 0) return;
+
+  console.log(`## ${sectionTitle}`);
+
+  const byCategory = groupByCategory(items);
+
+  for (const [category, catItems] of byCategory) {
+    console.log(`  ### ${category}`);
+    for (const item of catItems) {
+      const qty = formatItemQuantity(item);
+      const recipes = item.recipes.length > 0 ? ` - ${item.recipes.join(', ')}` : '';
+      const manual = item.isManual ? ' (manual)' : '';
+      const qtyPart = qty ? ` (${qty})` : '';
+      console.log(`  - ${getStatusSymbol(item.status)} ${item.name}${qtyPart}${recipes}${manual}`);
+    }
+  }
+  console.log('');
+}
+
+/**
  * Display persistent grocery list in terminal format
  */
 function displayPersistentGroceryList(list: PersistentGroceryList): void {
@@ -271,41 +326,9 @@ function displayPersistentGroceryList(list: PersistentGroceryList): void {
   const partial = list.items.filter(i => i.status === 'partial');
   const alreadyHave = list.items.filter(i => i.status === 'already_have');
 
-  if (needToBuy.length > 0) {
-    console.log('## Need to Buy');
-    for (const item of needToBuy) {
-      const qty = formatItemQuantity(item);
-      const recipes = item.recipes.length > 0 ? ` - ${item.recipes.join(', ')}` : '';
-      const manual = item.isManual ? ' (manual)' : '';
-      const qtyPart = qty ? ` (${qty})` : '';
-      console.log(`- ${getStatusSymbol(item.status)} ${item.name}${qtyPart}${recipes}${manual}`);
-    }
-    console.log('');
-  }
-
-  if (partial.length > 0) {
-    console.log('## Partial');
-    for (const item of partial) {
-      const qty = formatItemQuantity(item);
-      const recipes = item.recipes.length > 0 ? ` - ${item.recipes.join(', ')}` : '';
-      const manual = item.isManual ? ' (manual)' : '';
-      const qtyPart = qty ? ` (${qty})` : '';
-      console.log(`- ${getStatusSymbol(item.status)} ${item.name}${qtyPart}${recipes}${manual}`);
-    }
-    console.log('');
-  }
-
-  if (alreadyHave.length > 0) {
-    console.log('## Already Have');
-    for (const item of alreadyHave) {
-      const qty = formatItemQuantity(item);
-      const recipes = item.recipes.length > 0 ? ` - ${item.recipes.join(', ')}` : '';
-      const manual = item.isManual ? ' (manual)' : '';
-      const qtyPart = qty ? ` (${qty})` : '';
-      console.log(`- ${getStatusSymbol(item.status)} ${item.name}${qtyPart}${recipes}${manual}`);
-    }
-    console.log('');
-  }
+  displayItemsByCategory(needToBuy, 'Need to Buy');
+  displayItemsByCategory(partial, 'Partial');
+  displayItemsByCategory(alreadyHave, 'Already Have');
 }
 
 // GENERATE command - now persists the grocery list

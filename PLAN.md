@@ -2309,8 +2309,8 @@ pnpm --filter @meals/core test
 
 ### Ticket: T030 Implement ingredient category management
 - **Priority:** P2
-- **Status:** Pending
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T030
 - **Scope:** Add ingredient categorization for better grocery list grouping
 - **Acceptance Criteria:**
   - Ingredients have category field (Produce, Dairy, Meat, Pantry, Frozen, Bakery, etc.)
@@ -2319,8 +2319,26 @@ pnpm --filter @meals/core test
   - Common ingredients auto-categorized during creation
 - **Validation Steps:** Generate grocery list, verify items grouped by category
 - **Notes:**
-  - Dependencies: T014 (grocery service - done)
-  - Category enum: Produce, Dairy, Meat, Seafood, Bakery, Frozen, Pantry, Beverages, Condiments, Spices, Other
+  - Orchestrator notes:
+    - Intended approach: Add category column to ingredients table via migration, create ingredient CLI commands, update grocery service to group by category, add common ingredient auto-categorization mapping
+    - Key constraints: Category enum values: Produce, Dairy, Meat, Seafood, Bakery, Frozen, Pantry, Beverages, Condiments, Spices, Other. Default to "Other" if not set.
+    - Dependencies: T014 (grocery service - done), T045 (grocery list persistence - done)
+    - Estimated complexity: moderate
+  - Original notes:
+    - Dependencies: T014 (grocery service - done)
+    - Category enum: Produce, Dairy, Meat, Seafood, Bakery, Frozen, Pantry, Beverages, Condiments, Spices, Other
+  - Agent-T030 implementation notes:
+    - Category column already exists in ingredients table from 001_initial.sql migration
+    - Added INGREDIENT_CATEGORIES constant with 11 categories: Produce, Dairy, Meat, Seafood, Bakery, Frozen, Pantry, Beverages, Condiments, Spices, Other
+    - Added getAutoCategory() function with 150+ common ingredient mappings for auto-categorization
+    - Updated getOrCreate() method to auto-categorize ingredients when no category provided
+    - Added updateCategory() and updateCategoryByName() methods to IngredientRepository
+    - Created CLI ingredient command with set-category, list, and categories subcommands
+    - Updated GroceryListItemWithStatus interface to include category field
+    - Updated displayPersistentGroceryList() to group items by category within status sections
+    - Added 27 new tests in ingredient.repo.test.ts for category functionality
+    - All validation steps passed: pnpm build, pnpm test (471 tests), CLI commands work correctly
+    - Grocery list now shows items grouped by category (Meat, Dairy, Produce, etc.) instead of just "Uncategorized"
 
 ### Ticket: T031 Implement pantry service and CLI
 - **Priority:** P2
