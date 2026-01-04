@@ -2815,8 +2815,8 @@ pnpm --filter @meals/core test
 
 ### Ticket: T048 Recipe scaling API
 - **Priority:** P2
-- **Status:** Pending
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T048
 - **Scope:** API endpoint to return recipe with ingredients scaled to specified servings
 - **Acceptance Criteria:**
   - API: POST /api/recipes/:id/scale with body { servings: number }
@@ -2829,8 +2829,20 @@ pnpm --filter @meals/core test
   - Scale down, verify fractions handled correctly
   - Verify unit conversions applied (large quantities simplified)
 - **Notes:**
-  - Builds on existing unit conversion logic in GroceryService
-  - Useful for batch cooking calculations
+  - Orchestrator notes:
+    - Intended approach: Add scaleRecipe method to RecipeService that takes recipe and target servings, scales all ingredient quantities. Add API endpoint POST /api/recipes/:id/scale. Add --servings flag to CLI recipe show command.
+    - Key constraints: Don't modify stored recipe - return scaled copy. Handle fractional quantities nicely. Consider unit simplification for large quantities.
+    - Dependencies: T009 (recipe service - done)
+    - Estimated complexity: moderate
+  - Original notes:
+    - Builds on existing unit conversion logic in GroceryService
+    - Useful for batch cooking calculations
+  - Agent notes:
+    - Implementation complete: Added scaleRecipe method to RecipeService with unit conversion support (g->kg, ml->l)
+    - Added POST /api/recipes/:id/scale endpoint with validation
+    - Added --servings/-s flag to CLI recipe show command
+    - Verified: build passes, all tests pass, CLI scaling works correctly
+    - Unit conversions verified: 500g @ 4x scale = 2kg, 400ml @ 4x scale = 1.6l
 
 ### Ticket: T049 Ingredient store sections
 - **Priority:** P2

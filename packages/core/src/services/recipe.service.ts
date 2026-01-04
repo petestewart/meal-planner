@@ -16,7 +16,99 @@ import type {
   CreateRecipe,
   UpdateRecipe,
   RecipeWithRelations,
+  RecipeIngredient,
 } from '../models/index.js';
+
+/**
+ * Unit conversion definitions for scaling.
+ * Defines base units and conversion factors.
+ */
+interface UnitConversion {
+  baseUnit: string;
+  factor: number;
+}
+
+/**
+ * Map of units to their base unit and conversion factor.
+ * Used for simplifying scaled quantities (e.g., 1500g -> 1.5kg).
+ */
+const UNIT_CONVERSIONS: Record<string, UnitConversion> = {
+  // Weight - base unit: g
+  'g': { baseUnit: 'g', factor: 1 },
+  'kg': { baseUnit: 'g', factor: 1000 },
+  'mg': { baseUnit: 'g', factor: 0.001 },
+  'oz': { baseUnit: 'g', factor: 28.3495 },
+  'lb': { baseUnit: 'g', factor: 453.592 },
+  // Volume - base unit: ml
+  'ml': { baseUnit: 'ml', factor: 1 },
+  'l': { baseUnit: 'ml', factor: 1000 },
+  'cl': { baseUnit: 'ml', factor: 10 },
+  'tsp': { baseUnit: 'ml', factor: 5 },
+  'tbsp': { baseUnit: 'ml', factor: 15 },
+  'cup': { baseUnit: 'ml', factor: 240 },
+  'fl oz': { baseUnit: 'ml', factor: 29.5735 },
+  'pint': { baseUnit: 'ml', factor: 473.176 },
+  'quart': { baseUnit: 'ml', factor: 946.353 },
+};
+
+/**
+ * Preferred units for display, ordered by size (largest first).
+ */
+const PREFERRED_UNITS: Record<string, { unit: string; minValue: number }[]> = {
+  'g': [
+    { unit: 'kg', minValue: 1000 },
+    { unit: 'g', minValue: 1 },
+  ],
+  'ml': [
+    { unit: 'l', minValue: 1000 },
+    { unit: 'ml', minValue: 1 },
+  ],
+};
+
+/**
+ * Convert a quantity from one unit to a more readable unit if applicable.
+ * E.g., 1500g -> 1.5kg, 2000ml -> 2l
+ */
+function simplifyUnit(quantity: number, unit: string): { quantity: number; unit: string } {
+  const lowerUnit = unit.toLowerCase();
+  const conversion = UNIT_CONVERSIONS[lowerUnit];
+
+  if (!conversion) {
+    // Unknown unit, return as-is
+    return { quantity, unit };
+  }
+
+  // Convert to base unit
+  const baseValue = quantity * conversion.factor;
+  const preferred = PREFERRED_UNITS[conversion.baseUnit];
+
+  if (!preferred) {
+    return { quantity, unit };
+  }
+
+  // Find the best unit for display
+  for (const { unit: targetUnit, minValue } of preferred) {
+    if (baseValue >= minValue) {
+      const targetConversion = UNIT_CONVERSIONS[targetUnit];
+      if (targetConversion) {
+        const newQuantity = baseValue / targetConversion.factor;
+        return { quantity: newQuantity, unit: targetUnit };
+      }
+    }
+  }
+
+  return { quantity, unit };
+}
+
+/**
+ * Format a number to a clean string, removing unnecessary decimal places.
+ * E.g., 1.0 -> 1, 1.5 -> 1.5, 1.333333 -> 1.33
+ */
+function formatQuantity(value: number): number {
+  // Round to 2 decimal places
+  const rounded = Math.round(value * 100) / 100;
+  return rounded;
+}
 
 /**
  * Default actor for operations when not specified.
@@ -177,5 +269,64 @@ export class RecipeService {
    */
   getRecipeAuditLog(recipeId: string) {
     return this.auditRepo.getByEntityId(recipeId);
+  }
+
+  /**
+   * Scale a recipe to a different number of servings.
+   * Returns a copy of the recipe with all ingredient quantities multiplied
+   * by (targetServings / originalServings).
+   *
+   * Does NOT modify the stored recipe.
+   *
+   * Handles unit conversions for readability (e.g., 1500g -> 1.5kg).
+   *
+   * @param recipeId - The ID of the recipe to scale
+   * @param targetServings - The desired number of servings
+   * @returns Scaled recipe copy, or null if recipe not found
+   */
+  scaleRecipe(recipeId: string, targetServings: number): RecipeWithRelations | null {
+    const recipe = this.recipeRepo.getById(recipeId);
+
+    if (!recipe) {
+      return null;
+    }
+
+    // Calculate scaling factor
+    const originalServings = recipe.servings || 1;
+    const scalingFactor = targetServings / originalServings;
+
+    // Scale ingredients
+    const scaledIngredients: RecipeIngredient[] | undefined = recipe.ingredients?.map(
+      (ing): RecipeIngredient => {
+        if (ing.quantity === null || ing.quantity === undefined) {
+          // No quantity to scale
+          return { ...ing };
+        }
+
+        const scaledQuantity = ing.quantity * scalingFactor;
+
+        // Apply unit simplification if possible
+        if (ing.unit) {
+          const simplified = simplifyUnit(scaledQuantity, ing.unit);
+          return {
+            ...ing,
+            quantity: formatQuantity(simplified.quantity),
+            unit: simplified.unit,
+          };
+        }
+
+        return {
+          ...ing,
+          quantity: formatQuantity(scaledQuantity),
+        };
+      }
+    );
+
+    // Return a copy with scaled values
+    return {
+      ...recipe,
+      servings: targetServings,
+      ingredients: scaledIngredients,
+    };
   }
 }

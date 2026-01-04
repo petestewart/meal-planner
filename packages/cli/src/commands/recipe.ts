@@ -357,12 +357,25 @@ recipeCommand
 recipeCommand
   .command('show <id>')
   .description('Show recipe details')
+  .option('-s, --servings <n>', 'Scale recipe to specified number of servings')
   .action((id: string, options, command) => {
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
 
     try {
       const { recipeService, tagRepo, ingredientRepo } = getServices(globalOpts.db);
-      const recipe = recipeService.getRecipe(id);
+
+      // If servings option is provided, scale the recipe
+      let recipe;
+      if (options.servings) {
+        const targetServings = parseInt(options.servings, 10);
+        if (isNaN(targetServings) || targetServings <= 0) {
+          printError('Servings must be a positive integer');
+          process.exit(1);
+        }
+        recipe = recipeService.scaleRecipe(id, targetServings);
+      } else {
+        recipe = recipeService.getRecipe(id);
+      }
 
       if (!recipe) {
         printError(`Recipe not found: ${id}`);

@@ -4,6 +4,7 @@
  * Endpoints:
  * - GET /api/recipes - List/search recipes
  * - GET /api/recipes/:id - Get recipe by ID
+ * - POST /api/recipes/:id/scale - Scale recipe to specified servings
  * - POST /api/recipes - Create recipe
  * - PUT /api/recipes/:id - Update recipe
  * - DELETE /api/recipes/:id - Delete recipe
@@ -62,6 +63,13 @@ const CreateRecipeBodySchema = z.object({
   sourceType: z.enum(['manual', 'imported', 'agent_curated']).optional(),
   cuisine: z.string().optional(),
   difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
+});
+
+/**
+ * Request body schema for scaling a recipe
+ */
+const ScaleRecipeBodySchema = z.object({
+  servings: z.number().int().positive('Servings must be a positive integer'),
 });
 
 /**
@@ -193,6 +201,45 @@ export async function recipeRoutes(server: FastifyInstance): Promise<void> {
       }
 
       return reply.send(successResponse(recipe));
+    }
+  );
+
+  /**
+   * POST /api/recipes/:id/scale - Scale recipe to specified servings
+   *
+   * Returns a copy of the recipe with all ingredient quantities scaled.
+   * Does not modify the stored recipe.
+   */
+  server.post(
+    '/api/recipes/:id/scale',
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: z.infer<typeof ScaleRecipeBodySchema>;
+      }>,
+      reply: FastifyReply
+    ) => {
+      const { id } = request.params;
+
+      // Parse and validate request body
+      const parseResult = ScaleRecipeBodySchema.safeParse(request.body);
+      if (!parseResult.success) {
+        throw new ApiError(
+          'VALIDATION_ERROR',
+          'Invalid request body',
+          parseResult.error.issues
+        );
+      }
+
+      const { servings } = parseResult.data;
+
+      const scaledRecipe = recipeService.scaleRecipe(id, servings);
+
+      if (!scaledRecipe) {
+        throw new ApiError('NOT_FOUND', `Recipe with ID '${id}' not found`);
+      }
+
+      return reply.send(successResponse(scaledRecipe));
     }
   );
 
