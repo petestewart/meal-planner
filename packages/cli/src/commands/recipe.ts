@@ -14,6 +14,8 @@ import {
   type UpdateRecipe,
   type CreateRecipeIngredientInput,
   type ImportOptions,
+  type RecipeModification,
+  type IngredientOverride,
 } from '@meals/core';
 import {
   printJson,
@@ -147,12 +149,30 @@ function formatRecipeMarkdown(
 }
 
 /**
+ * Apply ingredient overrides to get the display name
+ * If an override exists for this ingredient, return the replacement name
+ */
+function applyIngredientOverride(
+  ingredientName: string,
+  overrides: IngredientOverride[]
+): { name: string; isOverridden: boolean } {
+  const override = overrides.find(
+    (o) => o.original.toLowerCase() === ingredientName.toLowerCase()
+  );
+  if (override) {
+    return { name: override.replacement, isOverridden: true };
+  }
+  return { name: ingredientName, isOverridden: false };
+}
+
+/**
  * Display recipe details in a nice terminal format
  */
 function displayRecipe(
   recipe: RecipeWithRelations,
   ingredientRepo: IngredientRepository,
-  tagRepo: TagRepository
+  tagRepo: TagRepository,
+  modifications?: RecipeModification | null
 ): void {
   console.log('');
   console.log(`  ${recipe.title}`);
@@ -177,18 +197,29 @@ function displayRecipe(
     console.log('');
   }
 
+  // Personal notes (if modifications exist)
+  if (modifications?.userNotes) {
+    console.log('  MY NOTES');
+    console.log('  --------');
+    console.log(`    ${modifications.userNotes}`);
+    console.log('');
+  }
+
   // Ingredients
   if (recipe.ingredients && recipe.ingredients.length > 0) {
     console.log('  INGREDIENTS');
     console.log('  -----------');
+    const overrides = modifications?.ingredientOverrides ?? [];
     for (const ing of recipe.ingredients) {
       const qty = ing.quantity ? `${ing.quantity}` : '';
       const unit = ing.unit || '';
       const prefix = [qty, unit].filter(Boolean).join(' ');
       const notes = ing.notes ? ` (${ing.notes})` : '';
       const optional = ing.optional ? ' [optional]' : '';
-      const ingredientName = resolveIngredientName(ingredientRepo, ing.ingredientId);
-      console.log(`    - ${prefix ? prefix + ' ' : ''}${ingredientName}${notes}${optional}`);
+      const originalName = resolveIngredientName(ingredientRepo, ing.ingredientId);
+      const { name: displayName, isOverridden } = applyIngredientOverride(originalName, overrides);
+      const overrideMarker = isOverridden ? ` [was: ${originalName}]` : '';
+      console.log(`    - ${prefix ? prefix + ' ' : ''}${displayName}${notes}${optional}${overrideMarker}`);
     }
     console.log('');
   }
@@ -382,10 +413,14 @@ recipeCommand
         process.exit(1);
       }
 
+      // Fetch modifications for this recipe
+      const modifications = recipeService.getModifications(id);
+
       if (globalOpts.json) {
-        printJson(recipe);
+        // Include modifications in JSON output
+        printJson({ ...recipe, modifications });
       } else {
-        displayRecipe(recipe, ingredientRepo, tagRepo);
+        displayRecipe(recipe, ingredientRepo, tagRepo, modifications);
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');
@@ -723,6 +758,183 @@ recipeCommand
         }
         console.log('');
         console.log(`Use "meals recipe show ${result.recipe.id}" to view full details.`);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// NOTE command - Add/show personal notes for a recipe
+recipeCommand
+  .command('note <id> [note]')
+  .description('Add or show personal notes for a recipe')
+  .option('--show', 'Show current notes instead of setting')
+  .option('--clear', 'Clear the note')
+  .action((id: string, note: string | undefined, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const { recipeService } = getServices(globalOpts.db);
+
+      // Verify recipe exists
+      const recipe = recipeService.getRecipe(id);
+      if (!recipe) {
+        printError(`Recipe not found: ${id}`);
+        process.exit(1);
+      }
+
+      // Show mode
+      if (options.show) {
+        const modifications = recipeService.getModifications(id);
+        if (globalOpts.json) {
+          printJson({
+            recipeId: id,
+            recipeTitle: recipe.title,
+            userNotes: modifications?.userNotes ?? null,
+          });
+        } else {
+          if (modifications?.userNotes) {
+            console.log('');
+            console.log(`  Notes for: ${recipe.title}`);
+            console.log('  ' + '-'.repeat(recipe.title.length + 11));
+            console.log(`  ${modifications.userNotes}`);
+            console.log('');
+          } else {
+            console.log(`No notes for recipe: ${recipe.title}`);
+          }
+        }
+        return;
+      }
+
+      // Clear mode
+      if (options.clear) {
+        recipeService.setRecipeNote(id, null, 'cli');
+        if (globalOpts.json) {
+          printJson({ recipeId: id, cleared: true });
+        } else {
+          printSuccess(`Cleared notes for: ${recipe.title}`);
+        }
+        return;
+      }
+
+      // Set mode - note is required
+      if (!note) {
+        printError('Note text is required. Use --show to view or --clear to remove.');
+        process.exit(1);
+      }
+
+      const modification = recipeService.setRecipeNote(id, note, 'cli');
+
+      if (globalOpts.json) {
+        printJson(modification);
+      } else {
+        printSuccess(`Added note to: ${recipe.title}`);
+        console.log(`  Note: ${note}`);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// OVERRIDE command - Add/manage ingredient overrides for a recipe
+recipeCommand
+  .command('override <id>')
+  .description('Add/manage ingredient substitutions for a recipe')
+  .option('--ingredient <name>', 'Original ingredient to replace')
+  .option('--replace <name>', 'Replacement ingredient')
+  .option('--remove <name>', 'Remove an override for the specified ingredient')
+  .option('--list', 'List all overrides for this recipe')
+  .option('--clear', 'Clear all overrides')
+  .action((id: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const { recipeService } = getServices(globalOpts.db);
+
+      // Verify recipe exists
+      const recipe = recipeService.getRecipe(id);
+      if (!recipe) {
+        printError(`Recipe not found: ${id}`);
+        process.exit(1);
+      }
+
+      // List mode
+      if (options.list) {
+        const modifications = recipeService.getModifications(id);
+        const overrides = modifications?.ingredientOverrides ?? [];
+
+        if (globalOpts.json) {
+          printJson({
+            recipeId: id,
+            recipeTitle: recipe.title,
+            ingredientOverrides: overrides,
+          });
+        } else {
+          console.log('');
+          console.log(`  Ingredient overrides for: ${recipe.title}`);
+          console.log('  ' + '-'.repeat(recipe.title.length + 25));
+          if (overrides.length === 0) {
+            console.log('  No overrides set.');
+          } else {
+            for (const override of overrides) {
+              console.log(`    ${override.original} -> ${override.replacement}`);
+            }
+          }
+          console.log('');
+        }
+        return;
+      }
+
+      // Clear mode
+      if (options.clear) {
+        const modifications = recipeService.getModifications(id);
+        if (modifications) {
+          recipeService.updateModifications(id, {
+            userNotes: modifications.userNotes,
+            ingredientOverrides: [],
+            instructionNotes: modifications.instructionNotes,
+          }, 'cli');
+        }
+        if (globalOpts.json) {
+          printJson({ recipeId: id, clearedOverrides: true });
+        } else {
+          printSuccess(`Cleared all ingredient overrides for: ${recipe.title}`);
+        }
+        return;
+      }
+
+      // Remove mode
+      if (options.remove) {
+        const modification = recipeService.removeIngredientOverride(id, options.remove, 'cli');
+        if (globalOpts.json) {
+          printJson(modification ?? { recipeId: id, removed: options.remove });
+        } else {
+          printSuccess(`Removed override for "${options.remove}" from: ${recipe.title}`);
+        }
+        return;
+      }
+
+      // Add mode - both --ingredient and --replace are required
+      if (!options.ingredient || !options.replace) {
+        printError('Both --ingredient and --replace are required to add an override.');
+        printError('Use --list to view, --remove <name> to remove, or --clear to remove all.');
+        process.exit(1);
+      }
+
+      const modification = recipeService.addIngredientOverride(
+        id,
+        options.ingredient,
+        options.replace,
+        'cli'
+      );
+
+      if (globalOpts.json) {
+        printJson(modification);
+      } else {
+        printSuccess(`Added override for: ${recipe.title}`);
+        console.log(`  ${options.ingredient} -> ${options.replace}`);
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');

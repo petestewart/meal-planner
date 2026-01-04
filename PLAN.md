@@ -2781,8 +2781,8 @@ pnpm --filter @meals/core test
 
 ### Ticket: T047 Recipe personal notes and modifications
 - **Priority:** P2
-- **Status:** Pending
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T047
 - **Scope:** Allow users to add personal notes and ingredient overrides to recipes without modifying original
 - **Acceptance Criteria:**
   - New table: `recipe_modifications` for per-recipe user customizations
@@ -2797,8 +2797,14 @@ pnpm --filter @meals/core test
   - Add ingredient override, verify shown in recipe display
   - Verify original recipe data unchanged
 - **Notes:**
-  - Migration: 004_recipe_modifications.sql
-  - Useful for tracking personal tweaks without forking recipes
+  - Orchestrator notes:
+    - Intended approach: Create migration 006_recipe_modifications.sql, create RecipeModificationRepository, add note and override CLI commands, update recipe show to display modifications, add API endpoints.
+    - Key constraints: Don't modify original recipe. ingredient_overrides stored as JSON array of {original, replacement} pairs.
+    - Dependencies: T009 (recipe service - done)
+    - Estimated complexity: moderate
+  - Original notes:
+    - Migration: 006_recipe_modifications.sql (note: migrations 002-005 already exist)
+    - Useful for tracking personal tweaks without forking recipes
   - Schema:
     ```sql
     CREATE TABLE recipe_modifications (
@@ -2812,6 +2818,15 @@ pnpm --filter @meals/core test
       UNIQUE(recipe_id)
     );
     ```
+  - **Subagent implementation notes:**
+    - Created 006_recipe_modifications.sql migration with schema as specified
+    - Created RecipeModificationRepository in packages/core/src/repos/recipe-modification.repo.ts
+    - Added modification methods to RecipeService (setRecipeNote, addIngredientOverride, getModifications, etc.)
+    - Added CLI commands: `meals recipe note <id> [note]` with --show/--clear options
+    - Added CLI commands: `meals recipe override <id>` with --ingredient/--replace/--list/--remove/--clear options
+    - Updated `recipe show` to display modifications (MY NOTES section, ingredient overrides marked with [was: original])
+    - Added API endpoints: GET/PUT/DELETE /api/recipes/:id/modifications
+    - All validation tests pass: build succeeds, 433 tests pass, CLI commands work as specified
 
 ### Ticket: T048 Recipe scaling API
 - **Priority:** P2

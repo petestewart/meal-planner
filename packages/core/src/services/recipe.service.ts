@@ -12,6 +12,11 @@ import {
   type ListRecipesOptions,
 } from '../repos/recipe.repo.js';
 import { AuditRepository, type AuditActor } from '../repos/audit.repo.js';
+import {
+  RecipeModificationRepository,
+  type RecipeModification,
+  type IngredientOverride,
+} from '../repos/recipe-modification.repo.js';
 import type {
   CreateRecipe,
   UpdateRecipe,
@@ -118,10 +123,12 @@ const DEFAULT_ACTOR: AuditActor = 'user';
 export class RecipeService {
   private recipeRepo: RecipeRepository;
   private auditRepo: AuditRepository;
+  private modificationRepo: RecipeModificationRepository;
 
   constructor(db: Database) {
     this.recipeRepo = new RecipeRepository(db);
     this.auditRepo = new AuditRepository(db);
+    this.modificationRepo = new RecipeModificationRepository(db);
   }
 
   /**
@@ -328,5 +335,190 @@ export class RecipeService {
       servings: targetServings,
       ingredients: scaledIngredients,
     };
+  }
+
+  // ==================== Recipe Modifications ====================
+
+  /**
+   * Get modifications for a recipe.
+   * Returns null if no modifications exist.
+   */
+  getModifications(recipeId: string): RecipeModification | null {
+    return this.modificationRepo.getByRecipeId(recipeId);
+  }
+
+  /**
+   * Check if a recipe has any modifications.
+   */
+  hasModifications(recipeId: string): boolean {
+    return this.modificationRepo.hasModifications(recipeId);
+  }
+
+  /**
+   * Set user notes for a recipe.
+   * Creates or updates the modification record.
+   * Logs 'update' action to audit log.
+   */
+  setRecipeNote(
+    recipeId: string,
+    notes: string | null,
+    actor: string = DEFAULT_ACTOR
+  ): RecipeModification {
+    // Verify recipe exists
+    if (!this.recipeRepo.exists(recipeId)) {
+      throw new Error(`Recipe not found: ${recipeId}`);
+    }
+
+    const modification = this.modificationRepo.setUserNotes(recipeId, notes);
+
+    this.auditRepo.log({
+      actor,
+      action: 'update',
+      entityType: 'recipe_modification',
+      entityId: recipeId,
+      details: {
+        field: 'user_notes',
+        hasNotes: notes !== null && notes.length > 0,
+      },
+    });
+
+    return modification;
+  }
+
+  /**
+   * Add an ingredient override for a recipe.
+   * If an override for the same original ingredient exists, it is replaced.
+   * Logs 'update' action to audit log.
+   */
+  addIngredientOverride(
+    recipeId: string,
+    original: string,
+    replacement: string,
+    actor: string = DEFAULT_ACTOR
+  ): RecipeModification {
+    // Verify recipe exists
+    if (!this.recipeRepo.exists(recipeId)) {
+      throw new Error(`Recipe not found: ${recipeId}`);
+    }
+
+    const modification = this.modificationRepo.addIngredientOverride(
+      recipeId,
+      original,
+      replacement
+    );
+
+    this.auditRepo.log({
+      actor,
+      action: 'update',
+      entityType: 'recipe_modification',
+      entityId: recipeId,
+      details: {
+        field: 'ingredient_override',
+        original,
+        replacement,
+      },
+    });
+
+    return modification;
+  }
+
+  /**
+   * Remove an ingredient override for a recipe.
+   * Logs 'update' action to audit log.
+   */
+  removeIngredientOverride(
+    recipeId: string,
+    original: string,
+    actor: string = DEFAULT_ACTOR
+  ): RecipeModification | null {
+    const modification = this.modificationRepo.removeIngredientOverride(
+      recipeId,
+      original
+    );
+
+    if (modification) {
+      this.auditRepo.log({
+        actor,
+        action: 'update',
+        entityType: 'recipe_modification',
+        entityId: recipeId,
+        details: {
+          field: 'ingredient_override',
+          removed: original,
+        },
+      });
+    }
+
+    return modification;
+  }
+
+  /**
+   * Clear all modifications for a recipe.
+   * Logs 'delete' action to audit log.
+   */
+  clearModifications(recipeId: string, actor: string = DEFAULT_ACTOR): boolean {
+    const deleted = this.modificationRepo.delete(recipeId);
+
+    if (deleted) {
+      this.auditRepo.log({
+        actor,
+        action: 'delete',
+        entityType: 'recipe_modification',
+        entityId: recipeId,
+        details: {},
+      });
+    }
+
+    return deleted;
+  }
+
+  /**
+   * Get a recipe with modifications applied.
+   * Ingredient overrides are applied to the display without modifying stored data.
+   */
+  getRecipeWithModifications(recipeId: string): {
+    recipe: RecipeWithRelations | null;
+    modifications: RecipeModification | null;
+  } {
+    const recipe = this.recipeRepo.getById(recipeId);
+    const modifications = this.modificationRepo.getByRecipeId(recipeId);
+
+    return { recipe, modifications };
+  }
+
+  /**
+   * Update modifications for a recipe (full update).
+   */
+  updateModifications(
+    recipeId: string,
+    data: {
+      userNotes?: string | null;
+      ingredientOverrides?: IngredientOverride[];
+      instructionNotes?: string | null;
+    },
+    actor: string = DEFAULT_ACTOR
+  ): RecipeModification {
+    // Verify recipe exists
+    if (!this.recipeRepo.exists(recipeId)) {
+      throw new Error(`Recipe not found: ${recipeId}`);
+    }
+
+    const modification = this.modificationRepo.upsert({
+      recipeId,
+      ...data,
+    });
+
+    this.auditRepo.log({
+      actor,
+      action: 'update',
+      entityType: 'recipe_modification',
+      entityId: recipeId,
+      details: {
+        hasNotes: data.userNotes !== null && data.userNotes !== undefined,
+        overrideCount: data.ingredientOverrides?.length ?? 0,
+      },
+    });
+
+    return modification;
   }
 }

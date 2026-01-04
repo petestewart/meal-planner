@@ -146,6 +146,11 @@ export {
   // Pantry repository (T031)
   PantryRepository,
   type ListPantryItemsOptions,
+  // Recipe modification repository (T047)
+  RecipeModificationRepository,
+  type RecipeModification,
+  type IngredientOverride,
+  type UpsertRecipeModification,
 } from './repos/index.js';
 
 // Re-export GroceryItemStatus type from repos

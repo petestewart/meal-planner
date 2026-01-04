@@ -19,6 +19,7 @@ import {
   type CreateRecipe,
   type ListRecipesOptions,
   type CreateRecipeIngredientInput,
+  type IngredientOverride,
 } from '@meals/core';
 import { successResponse } from '../types.js';
 import { ApiError } from '../middleware/error-handler.js';
@@ -367,6 +368,109 @@ export async function recipeRoutes(server: FastifyInstance): Promise<void> {
       }
 
       return reply.send(successResponse({ deleted: true }));
+    }
+  );
+
+  // ==================== Recipe Modifications ====================
+
+  /**
+   * Request body schema for updating recipe modifications
+   */
+  const UpdateModificationsBodySchema = z.object({
+    userNotes: z.string().nullable().optional(),
+    ingredientOverrides: z.array(z.object({
+      original: z.string().min(1),
+      replacement: z.string().min(1),
+    })).optional(),
+    instructionNotes: z.string().nullable().optional(),
+  });
+
+  /**
+   * GET /api/recipes/:id/modifications - Get recipe modifications
+   */
+  server.get(
+    '/api/recipes/:id/modifications',
+    async (
+      request: FastifyRequest<{ Params: { id: string } }>,
+      reply: FastifyReply
+    ) => {
+      const { id } = request.params;
+
+      // Check if recipe exists
+      if (!recipeService.recipeExists(id)) {
+        throw new ApiError('NOT_FOUND', `Recipe with ID '${id}' not found`);
+      }
+
+      const modifications = recipeService.getModifications(id);
+
+      return reply.send(successResponse(modifications));
+    }
+  );
+
+  /**
+   * PUT /api/recipes/:id/modifications - Update recipe modifications
+   */
+  server.put(
+    '/api/recipes/:id/modifications',
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: z.infer<typeof UpdateModificationsBodySchema>;
+      }>,
+      reply: FastifyReply
+    ) => {
+      const { id } = request.params;
+
+      // Check if recipe exists
+      if (!recipeService.recipeExists(id)) {
+        throw new ApiError('NOT_FOUND', `Recipe with ID '${id}' not found`);
+      }
+
+      // Parse and validate request body
+      const parseResult = UpdateModificationsBodySchema.safeParse(request.body);
+      if (!parseResult.success) {
+        throw new ApiError(
+          'VALIDATION_ERROR',
+          'Invalid modification data',
+          parseResult.error.issues
+        );
+      }
+
+      const { userNotes, ingredientOverrides, instructionNotes } = parseResult.data;
+
+      const modification = recipeService.updateModifications(
+        id,
+        {
+          userNotes,
+          ingredientOverrides: ingredientOverrides as IngredientOverride[] | undefined,
+          instructionNotes,
+        },
+        'api'
+      );
+
+      return reply.send(successResponse(modification));
+    }
+  );
+
+  /**
+   * DELETE /api/recipes/:id/modifications - Clear recipe modifications
+   */
+  server.delete(
+    '/api/recipes/:id/modifications',
+    async (
+      request: FastifyRequest<{ Params: { id: string } }>,
+      reply: FastifyReply
+    ) => {
+      const { id } = request.params;
+
+      // Check if recipe exists
+      if (!recipeService.recipeExists(id)) {
+        throw new ApiError('NOT_FOUND', `Recipe with ID '${id}' not found`);
+      }
+
+      const deleted = recipeService.clearModifications(id, 'api');
+
+      return reply.send(successResponse({ deleted }));
     }
   );
 

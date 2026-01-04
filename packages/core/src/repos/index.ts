@@ -49,3 +49,10 @@ export {
   PantryRepository,
   type ListPantryItemsOptions,
 } from './pantry.repo.js';
+
+export {
+  RecipeModificationRepository,
+  type RecipeModification,
+  type IngredientOverride,
+  type UpsertRecipeModification,
+} from './recipe-modification.repo.js';
