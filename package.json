@@ -8,7 +8,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "clean": "pnpm -r clean"
+    "clean": "pnpm -r clean",
+    "meals": "node ./packages/cli/dist/bin/meals.js"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.16",

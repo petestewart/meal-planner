@@ -452,14 +452,21 @@ export class ImportService {
 
       const page = await context.newPage();
 
-      // Navigate to the URL and wait for the page to load
+      // Navigate to the URL and wait for DOM to be ready
+      // Using 'domcontentloaded' instead of 'networkidle' because:
+      // - 'networkidle' waits for no network activity for 500ms, which can timeout
+      //   on sites with continuous background requests (ads, analytics, trackers)
+      // - 'domcontentloaded' fires when HTML is parsed, which is sufficient for
+      //   extracting JSON-LD recipe data that's embedded in the initial HTML
       await page.goto(url, {
-        waitUntil: 'networkidle',
-        timeout: 60000,
+        waitUntil: 'domcontentloaded',
+        timeout: 90000,
       });
 
-      // Wait a bit for any JavaScript rendering
-      await page.waitForTimeout(2000);
+      // Wait for body to be available and give time for any critical JS to run
+      // This handles cases where JSON-LD is injected via JavaScript
+      await page.waitForSelector('body', { timeout: 10000 });
+      await page.waitForTimeout(3000);
 
       // Get the full page HTML after JavaScript execution
       const html = await page.content();
