@@ -28,3 +28,13 @@ export {
 export { TagRepository } from './tag.repo.js';
 
 export { IngredientRepository } from './ingredient.repo.js';
+
+export {
+  GroceryListRepository,
+  type GroceryItemStatus,
+  type PersistedGroceryList,
+  type PersistedGroceryItem,
+  type PersistedGroceryListWithItems,
+  type CreateGroceryItemInput,
+  type UpdateGroceryItemInput,
+} from './grocery-list.repo.js';

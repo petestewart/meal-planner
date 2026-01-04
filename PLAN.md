@@ -2589,8 +2589,8 @@ pnpm --filter @meals/core test
 
 ### Ticket: T045 Grocery list persistence and state tracking
 - **Priority:** P1
-- **Status:** Pending
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T045
 - **Scope:** Persist grocery lists with item states for shopping workflow
 - **Acceptance Criteria:**
   - New tables: `grocery_lists` and `grocery_list_items`
@@ -2611,8 +2611,22 @@ pnpm --filter @meals/core test
   - Add manual item, verify it appears in list
   - Check pantry, verify matching items marked
 - **Notes:**
-  - Migration: 002_grocery_list_persistence.sql
-  - Integrates with T031 (pantry) for check-pantry feature
+  - Orchestrator notes:
+    - Intended approach: Create migration 002_grocery_list_persistence.sql with new tables, create GroceryListRepository for persistence, update GroceryService to use persistent storage, add CLI commands (list, check, add), add API endpoints
+    - Key constraints: Migration must handle existing deployments gracefully. Item states: need_to_buy (default), already_have, partial. Partial state needs have_quantity tracking. check-pantry feature depends on T031 which is not done - implement as stub that returns empty/warning for now.
+    - Dependencies: T014 (grocery service - done)
+    - Estimated complexity: high (migration + repo + service updates + CLI + API)
+  - Original notes:
+    - Migration: 002_grocery_list_persistence.sql
+    - Integrates with T031 (pantry) for check-pantry feature
+  - **Agent-T045 Implementation Notes:**
+    - Created migration 002_grocery_list_persistence.sql with grocery_lists and grocery_list_items tables
+    - Created GroceryListRepository at packages/core/src/repos/grocery-list.repo.ts
+    - Extended GroceryService with persistent storage methods: generateAndPersist(), getPersistentList(), addManualItem(), checkItem(), checkItemPartial(), uncheckItem(), checkPantry()
+    - Updated CLI grocery commands: generate (now persists), list, check, uncheck, add, check-pantry
+    - Added API endpoints: GET/PUT/DELETE /api/grocery-list/:week/items/:id, POST /api/grocery-list/:week/items, POST /api/grocery-list/:week/check-pantry
+    - check-pantry implemented as stub returning warning since T031 (pantry service) is not done
+    - All validation steps pass: pnpm build, pnpm test, CLI commands work correctly
   - Schema:
     ```sql
     CREATE TABLE grocery_lists (

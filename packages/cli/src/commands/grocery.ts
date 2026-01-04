@@ -8,11 +8,15 @@ import {
   PlanService,
   type GroceryList,
   type GroceryGroup,
+  type PersistentGroceryList,
+  type GroceryListItemWithStatus,
+  type GroceryItemStatus,
 } from '@meals/core';
 import {
   printJson,
   printSuccess,
   printError,
+  printWarning,
   getGlobalOptions,
   type GlobalOptions,
 } from '../output.js';
@@ -213,10 +217,101 @@ export const groceryCommand = new Command('grocery')
     console.log('Grocery commands - use --help to see available subcommands.');
   });
 
-// GENERATE command
+/**
+ * Get status symbol for display
+ */
+function getStatusSymbol(status: GroceryItemStatus): string {
+  switch (status) {
+    case 'already_have':
+      return '[x]';
+    case 'partial':
+      return '[~]';
+    case 'need_to_buy':
+    default:
+      return '[ ]';
+  }
+}
+
+/**
+ * Format quantity with optional have quantity for partial items
+ */
+function formatItemQuantity(item: GroceryListItemWithStatus): string {
+  if (item.quantity === null || item.quantity === 0) {
+    return '';
+  }
+
+  const unit = item.unit || '';
+  const qty = `${item.quantity}${unit ? ' ' + unit : ''}`;
+
+  if (item.status === 'partial' && item.haveQuantity !== null) {
+    return `${qty} (have: ${item.haveQuantity}${unit ? ' ' + unit : ''})`;
+  }
+
+  return qty;
+}
+
+/**
+ * Display persistent grocery list in terminal format
+ */
+function displayPersistentGroceryList(list: PersistentGroceryList): void {
+  console.log('');
+  console.log(`Grocery List for ${list.week}`);
+  console.log('='.repeat(40));
+  console.log(`Status: ${list.counts.needToBuy} to buy, ${list.counts.alreadyHave} have, ${list.counts.partial} partial`);
+  console.log('');
+
+  if (list.items.length === 0) {
+    console.log('No items in grocery list.');
+    console.log('');
+    return;
+  }
+
+  // Group items by status for display
+  const needToBuy = list.items.filter(i => i.status === 'need_to_buy');
+  const partial = list.items.filter(i => i.status === 'partial');
+  const alreadyHave = list.items.filter(i => i.status === 'already_have');
+
+  if (needToBuy.length > 0) {
+    console.log('## Need to Buy');
+    for (const item of needToBuy) {
+      const qty = formatItemQuantity(item);
+      const recipes = item.recipes.length > 0 ? ` - ${item.recipes.join(', ')}` : '';
+      const manual = item.isManual ? ' (manual)' : '';
+      const qtyPart = qty ? ` (${qty})` : '';
+      console.log(`- ${getStatusSymbol(item.status)} ${item.name}${qtyPart}${recipes}${manual}`);
+    }
+    console.log('');
+  }
+
+  if (partial.length > 0) {
+    console.log('## Partial');
+    for (const item of partial) {
+      const qty = formatItemQuantity(item);
+      const recipes = item.recipes.length > 0 ? ` - ${item.recipes.join(', ')}` : '';
+      const manual = item.isManual ? ' (manual)' : '';
+      const qtyPart = qty ? ` (${qty})` : '';
+      console.log(`- ${getStatusSymbol(item.status)} ${item.name}${qtyPart}${recipes}${manual}`);
+    }
+    console.log('');
+  }
+
+  if (alreadyHave.length > 0) {
+    console.log('## Already Have');
+    for (const item of alreadyHave) {
+      const qty = formatItemQuantity(item);
+      const recipes = item.recipes.length > 0 ? ` - ${item.recipes.join(', ')}` : '';
+      const manual = item.isManual ? ' (manual)' : '';
+      const qtyPart = qty ? ` (${qty})` : '';
+      console.log(`- ${getStatusSymbol(item.status)} ${item.name}${qtyPart}${recipes}${manual}`);
+    }
+    console.log('');
+  }
+}
+
+// GENERATE command - now persists the grocery list
 groceryCommand
   .command('generate [week]')
-  .description('Generate grocery list for a week (week format: YYYY-Wnn, this-week, or next-week)')
+  .description('Generate and persist grocery list for a week (week format: YYYY-Wnn, this-week, or next-week)')
   .option('--include-pantry', 'Include items already in pantry')
   .option('--group-by <method>', 'Group by: category, recipe, or aisle', 'category')
   .action((week: string | undefined, options, command) => {
@@ -240,7 +335,8 @@ groceryCommand
         targetWeek = currentWeek;
       }
 
-      const list = groceryService.generateList(targetWeek);
+      // Use the new generateAndPersist method
+      const list = groceryService.generateAndPersist(targetWeek);
 
       if (!list) {
         printError(`No plan found for week ${targetWeek}`);
@@ -250,7 +346,193 @@ groceryCommand
       if (globalOpts.json) {
         printJson(list);
       } else {
-        displayGroceryList(list);
+        printSuccess(`Generated grocery list for ${targetWeek}`);
+        displayPersistentGroceryList(list);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// LIST command - shows current persistent grocery list
+groceryCommand
+  .command('list [week]')
+  .description('Show the current grocery list for a week')
+  .option('--status <status>', 'Filter by status: need_to_buy, already_have, partial')
+  .action((week: string | undefined, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const groceryService = getGroceryService(globalOpts.db);
+      const planService = getPlanService(globalOpts.db);
+
+      let targetWeek: string;
+
+      if (week) {
+        targetWeek = parseWeek(week);
+      } else {
+        // Get current plan week
+        const currentWeek = getCurrentPlanWeek(planService);
+        if (!currentWeek) {
+          printError('No active plan found. Specify a week or create a plan first.');
+          process.exit(1);
+        }
+        targetWeek = currentWeek;
+      }
+
+      const list = groceryService.getPersistentList(targetWeek);
+
+      if (!list) {
+        printError(`No grocery list found for week ${targetWeek}. Generate one first with 'grocery generate ${targetWeek}'`);
+        process.exit(1);
+      }
+
+      // Filter by status if specified
+      if (options.status) {
+        const status = options.status as GroceryItemStatus;
+        list.items = list.items.filter(item => item.status === status);
+      }
+
+      if (globalOpts.json) {
+        printJson(list);
+      } else {
+        displayPersistentGroceryList(list);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// CHECK command - marks an item as already_have
+groceryCommand
+  .command('check <week> <item>')
+  .description('Mark an item as already have (checked off)')
+  .option('--partial <quantity>', 'Mark as partial with have quantity', parseFloat)
+  .action((week: string, item: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const groceryService = getGroceryService(globalOpts.db);
+      const targetWeek = parseWeek(week);
+
+      let updatedItem: GroceryListItemWithStatus | null;
+
+      if (options.partial !== undefined) {
+        // Mark as partial
+        updatedItem = groceryService.checkItemPartial(targetWeek, item, options.partial);
+      } else {
+        // Mark as already have
+        updatedItem = groceryService.checkItem(targetWeek, item);
+      }
+
+      if (!updatedItem) {
+        printError(`Item "${item}" not found in grocery list for week ${targetWeek}`);
+        process.exit(1);
+      }
+
+      if (globalOpts.json) {
+        printJson(updatedItem);
+      } else {
+        if (options.partial !== undefined) {
+          printSuccess(`Marked "${updatedItem.name}" as partial (have: ${options.partial})`);
+        } else {
+          printSuccess(`Marked "${updatedItem.name}" as already have`);
+        }
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// UNCHECK command - marks an item back to need_to_buy
+groceryCommand
+  .command('uncheck <week> <item>')
+  .description('Mark an item as need to buy (unchecked)')
+  .action((week: string, item: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const groceryService = getGroceryService(globalOpts.db);
+      const targetWeek = parseWeek(week);
+
+      const updatedItem = groceryService.uncheckItem(targetWeek, item);
+
+      if (!updatedItem) {
+        printError(`Item "${item}" not found in grocery list for week ${targetWeek}`);
+        process.exit(1);
+      }
+
+      if (globalOpts.json) {
+        printJson(updatedItem);
+      } else {
+        printSuccess(`Marked "${updatedItem.name}" as need to buy`);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// ADD command - adds a manual item
+groceryCommand
+  .command('add <week> <item>')
+  .description('Add a manual item to the grocery list')
+  .option('--quantity <n>', 'Quantity to add', parseFloat)
+  .option('--unit <unit>', 'Unit of measurement')
+  .action((week: string, item: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const groceryService = getGroceryService(globalOpts.db);
+      const targetWeek = parseWeek(week);
+
+      const addedItem = groceryService.addManualItem(
+        targetWeek,
+        item,
+        options.quantity ?? null,
+        options.unit ?? null
+      );
+
+      if (!addedItem) {
+        printError(`Failed to add item "${item}" to grocery list for week ${targetWeek}`);
+        process.exit(1);
+      }
+
+      if (globalOpts.json) {
+        printJson(addedItem);
+      } else {
+        const qty = options.quantity ? ` (${options.quantity}${options.unit ? ' ' + options.unit : ''})` : '';
+        printSuccess(`Added "${addedItem.name}"${qty} to grocery list for ${targetWeek}`);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// CHECK-PANTRY command - bulk marks items from pantry
+groceryCommand
+  .command('check-pantry <week>')
+  .description('Bulk-mark items from pantry as already have')
+  .action((week: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const groceryService = getGroceryService(globalOpts.db);
+      const targetWeek = parseWeek(week);
+
+      const result = groceryService.checkPantry(targetWeek);
+
+      if (globalOpts.json) {
+        printJson(result);
+      } else {
+        if (result.warning) {
+          printWarning(result.warning);
+        }
+        console.log(`Checked ${result.itemsChecked} items, marked ${result.itemsMarked} as already have`);
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');

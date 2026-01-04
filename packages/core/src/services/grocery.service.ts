@@ -9,6 +9,13 @@
 import type { Database } from 'better-sqlite3';
 import { PlanRepository } from '../repos/plan.repo.js';
 import { RecipeRepository } from '../repos/recipe.repo.js';
+import {
+  GroceryListRepository,
+  type PersistedGroceryListWithItems,
+  type PersistedGroceryItem,
+  type GroceryItemStatus,
+  type CreateGroceryItemInput,
+} from '../repos/grocery-list.repo.js';
 import type { WeeklyPlanWithItems, RecipeWithRelations } from '../models/index.js';
 
 /**
@@ -187,15 +194,58 @@ function toDisplayUnit(quantity: number, baseUnit: string): { quantity: number; 
   };
 }
 
+/**
+ * A persistent grocery list item with status
+ */
+export interface GroceryListItemWithStatus {
+  id: string;
+  name: string;
+  quantity: number | null;
+  unit: string | null;
+  status: GroceryItemStatus;
+  haveQuantity: number | null;
+  isManual: boolean;
+  recipes: string[];
+  ingredientId: string | null;
+}
+
+/**
+ * A persistent grocery list with items and status counts
+ */
+export interface PersistentGroceryList {
+  id: string;
+  week: string;
+  generatedAt: string | null;
+  updatedAt: string | null;
+  items: GroceryListItemWithStatus[];
+  counts: {
+    needToBuy: number;
+    alreadyHave: number;
+    partial: number;
+  };
+}
+
+/**
+ * Result of check-pantry operation
+ */
+export interface CheckPantryResult {
+  week: string;
+  itemsChecked: number;
+  itemsMarked: number;
+  warning?: string;
+}
+
 export class GroceryService {
   private planRepo: PlanRepository;
   private recipeRepo: RecipeRepository;
+  private groceryListRepo: GroceryListRepository;
   private db: Database;
 
   constructor(db: Database) {
     this.db = db;
     this.planRepo = new PlanRepository(db);
     this.recipeRepo = new RecipeRepository(db);
+    this.groceryListRepo = new GroceryListRepository(db);
   }
 
   /**
@@ -413,5 +463,339 @@ export class GroceryService {
       return null;
     }
     return this.generateList(plan.id);
+  }
+
+  // ============================================
+  // Persistent Grocery List Methods
+  // ============================================
+
+  /**
+   * Generate and persist a grocery list for a week.
+   * This creates/updates the persistent list while preserving manual items.
+   *
+   * @param week - ISO week string (e.g., "2025-W02")
+   * @returns Persistent grocery list with items and status counts
+   */
+  generateAndPersist(week: string): PersistentGroceryList | null {
+    // Generate the grocery list from the meal plan
+    const generatedList = this.generateListForWeek(week);
+    if (!generatedList) {
+      return null;
+    }
+
+    // Get or create the persistent list for this week
+    const persistentList = this.groceryListRepo.getOrCreateByWeek(week);
+
+    // Clear non-manual items (preserves manually added items)
+    this.groceryListRepo.clearNonManualItems(persistentList.id);
+
+    // Convert generated items to persistent format
+    const itemsToAdd: CreateGroceryItemInput[] = [];
+    for (const group of generatedList.groups) {
+      for (const item of group.items) {
+        // Look up ingredient ID if we have the ingredient name
+        const ingredientRow = this.db
+          .prepare('SELECT id FROM ingredients WHERE LOWER(name) = LOWER(?)')
+          .get(item.ingredient) as { id: string } | undefined;
+
+        itemsToAdd.push({
+          ingredientId: ingredientRow?.id ?? null,
+          name: item.ingredient,
+          quantity: item.totalQuantity,
+          unit: item.unit,
+          status: 'need_to_buy',
+          isManual: false,
+          recipes: item.recipes,
+        });
+      }
+    }
+
+    // Bulk add the generated items
+    if (itemsToAdd.length > 0) {
+      this.groceryListRepo.bulkAddItems(persistentList.id, itemsToAdd);
+    }
+
+    // Set generated_at timestamp
+    this.groceryListRepo.setGeneratedAt(persistentList.id);
+
+    // Return the full persistent list
+    return this.getPersistentList(week);
+  }
+
+  /**
+   * Get a persistent grocery list for a week.
+   *
+   * @param week - ISO week string (e.g., "2025-W02")
+   * @returns Persistent grocery list or null if not found
+   */
+  getPersistentList(week: string): PersistentGroceryList | null {
+    const list = this.groceryListRepo.getByWeek(week);
+    if (!list) {
+      return null;
+    }
+
+    return this.convertToPublicFormat(list);
+  }
+
+  /**
+   * Convert internal format to public format
+   */
+  private convertToPublicFormat(list: PersistedGroceryListWithItems): PersistentGroceryList {
+    const counts = this.groceryListRepo.countByStatus(list.id);
+
+    return {
+      id: list.id,
+      week: list.week,
+      generatedAt: list.generatedAt,
+      updatedAt: list.updatedAt,
+      items: list.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        status: item.status,
+        haveQuantity: item.haveQuantity,
+        isManual: item.isManual,
+        recipes: item.recipes,
+        ingredientId: item.ingredientId,
+      })),
+      counts,
+    };
+  }
+
+  /**
+   * Add a manual item to a grocery list.
+   *
+   * @param week - ISO week string
+   * @param name - Item name
+   * @param quantity - Optional quantity
+   * @param unit - Optional unit
+   * @returns The added item
+   */
+  addManualItem(
+    week: string,
+    name: string,
+    quantity?: number | null,
+    unit?: string | null
+  ): GroceryListItemWithStatus | null {
+    const list = this.groceryListRepo.getOrCreateByWeek(week);
+
+    // Check if item already exists
+    const existing = this.groceryListRepo.findItemByName(list.id, name);
+    if (existing) {
+      // Update quantity if item exists
+      if (quantity !== undefined) {
+        const newQuantity = (existing.quantity ?? 0) + (quantity ?? 0);
+        this.groceryListRepo.updateItem(existing.id, { quantity: newQuantity });
+      }
+      const updated = this.groceryListRepo.getItemById(existing.id);
+      return updated ? this.convertItemToPublic(updated) : null;
+    }
+
+    // Add new manual item
+    const item = this.groceryListRepo.addItem(list.id, {
+      name,
+      quantity: quantity ?? null,
+      unit: unit ?? null,
+      isManual: true,
+      status: 'need_to_buy',
+    });
+
+    return this.convertItemToPublic(item);
+  }
+
+  /**
+   * Convert internal item to public format
+   */
+  private convertItemToPublic(item: PersistedGroceryItem): GroceryListItemWithStatus {
+    return {
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      unit: item.unit,
+      status: item.status,
+      haveQuantity: item.haveQuantity,
+      isManual: item.isManual,
+      recipes: item.recipes,
+      ingredientId: item.ingredientId,
+    };
+  }
+
+  /**
+   * Mark an item as "already have" (checked off).
+   *
+   * @param week - ISO week string
+   * @param itemNameOrId - Item name or ID
+   * @returns The updated item or null if not found
+   */
+  checkItem(week: string, itemNameOrId: string): GroceryListItemWithStatus | null {
+    const list = this.groceryListRepo.getByWeek(week);
+    if (!list) {
+      return null;
+    }
+
+    // Try to find by ID first, then by name
+    let item = this.groceryListRepo.getItemById(itemNameOrId);
+    if (!item || item.groceryListId !== list.id) {
+      item = this.groceryListRepo.findItemByName(list.id, itemNameOrId);
+    }
+
+    if (!item) {
+      return null;
+    }
+
+    const updated = this.groceryListRepo.markAsHave(item.id);
+    return updated ? this.convertItemToPublic(updated) : null;
+  }
+
+  /**
+   * Mark an item as "partial" with a have_quantity.
+   *
+   * @param week - ISO week string
+   * @param itemNameOrId - Item name or ID
+   * @param haveQuantity - Quantity already on hand
+   * @returns The updated item or null if not found
+   */
+  checkItemPartial(
+    week: string,
+    itemNameOrId: string,
+    haveQuantity: number
+  ): GroceryListItemWithStatus | null {
+    const list = this.groceryListRepo.getByWeek(week);
+    if (!list) {
+      return null;
+    }
+
+    // Try to find by ID first, then by name
+    let item = this.groceryListRepo.getItemById(itemNameOrId);
+    if (!item || item.groceryListId !== list.id) {
+      item = this.groceryListRepo.findItemByName(list.id, itemNameOrId);
+    }
+
+    if (!item) {
+      return null;
+    }
+
+    const updated = this.groceryListRepo.markAsPartial(item.id, haveQuantity);
+    return updated ? this.convertItemToPublic(updated) : null;
+  }
+
+  /**
+   * Reset an item to "need to buy" status.
+   *
+   * @param week - ISO week string
+   * @param itemNameOrId - Item name or ID
+   * @returns The updated item or null if not found
+   */
+  uncheckItem(week: string, itemNameOrId: string): GroceryListItemWithStatus | null {
+    const list = this.groceryListRepo.getByWeek(week);
+    if (!list) {
+      return null;
+    }
+
+    // Try to find by ID first, then by name
+    let item = this.groceryListRepo.getItemById(itemNameOrId);
+    if (!item || item.groceryListId !== list.id) {
+      item = this.groceryListRepo.findItemByName(list.id, itemNameOrId);
+    }
+
+    if (!item) {
+      return null;
+    }
+
+    const updated = this.groceryListRepo.markAsNeedToBuy(item.id);
+    return updated ? this.convertItemToPublic(updated) : null;
+  }
+
+  /**
+   * Get an item by ID.
+   *
+   * @param itemId - Item ID
+   * @returns The item or null if not found
+   */
+  getItemById(itemId: string): GroceryListItemWithStatus | null {
+    const item = this.groceryListRepo.getItemById(itemId);
+    return item ? this.convertItemToPublic(item) : null;
+  }
+
+  /**
+   * Update an item by ID.
+   *
+   * @param itemId - Item ID
+   * @param updates - Fields to update
+   * @returns The updated item or null if not found
+   */
+  updateItem(
+    itemId: string,
+    updates: {
+      status?: GroceryItemStatus;
+      haveQuantity?: number | null;
+      quantity?: number | null;
+      unit?: string | null;
+    }
+  ): GroceryListItemWithStatus | null {
+    const item = this.groceryListRepo.updateItem(itemId, updates);
+    return item ? this.convertItemToPublic(item) : null;
+  }
+
+  /**
+   * Delete an item by ID.
+   *
+   * @param itemId - Item ID
+   * @returns true if deleted, false if not found
+   */
+  deleteItem(itemId: string): boolean {
+    return this.groceryListRepo.deleteItem(itemId);
+  }
+
+  /**
+   * Bulk-mark items from pantry.
+   * Note: This is a stub implementation as pantry integration (T031) is not complete.
+   *
+   * @param week - ISO week string
+   * @returns Result with warning about incomplete feature
+   */
+  checkPantry(week: string): CheckPantryResult {
+    const list = this.groceryListRepo.getByWeek(week);
+    if (!list) {
+      return {
+        week,
+        itemsChecked: 0,
+        itemsMarked: 0,
+        warning: 'No grocery list found for this week. Generate one first with "grocery generate".',
+      };
+    }
+
+    // Stub implementation - pantry integration not yet complete
+    // When T031 is complete, this will:
+    // 1. Query pantry_items table
+    // 2. Match against grocery list items by ingredient_id
+    // 3. Mark matches as already_have or partial based on quantities
+
+    return {
+      week,
+      itemsChecked: list.items.length,
+      itemsMarked: 0,
+      warning:
+        'Pantry integration is not yet implemented (depends on T031). ' +
+        'Use "grocery check <item>" to manually mark items you already have.',
+    };
+  }
+
+  /**
+   * Get items by status for a week.
+   *
+   * @param week - ISO week string
+   * @param status - Item status filter
+   * @returns Items matching the status
+   */
+  getItemsByStatus(week: string, status: GroceryItemStatus): GroceryListItemWithStatus[] {
+    const list = this.groceryListRepo.getByWeek(week);
+    if (!list) {
+      return [];
+    }
+
+    const items = this.groceryListRepo.getItemsByStatus(list.id, status);
+    return items.map((item) => this.convertItemToPublic(item));
   }
 }

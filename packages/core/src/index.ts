@@ -118,7 +118,16 @@ export {
   type PreferenceData,
   TagRepository,
   IngredientRepository,
+  GroceryListRepository,
+  type PersistedGroceryList,
+  type PersistedGroceryItem,
+  type PersistedGroceryListWithItems,
+  type CreateGroceryItemInput,
+  type UpdateGroceryItemInput,
 } from './repos/index.js';
+
+// Re-export GroceryItemStatus type from repos
+export type { GroceryItemStatus } from './repos/index.js';
 
 // Services
 export {
@@ -128,6 +137,9 @@ export {
   type GroceryItem,
   type GroceryGroup,
   type GroceryList,
+  type GroceryListItemWithStatus,
+  type PersistentGroceryList,
+  type CheckPantryResult,
   PreferenceService,
   ImportService,
   type ImportedRecipeData,

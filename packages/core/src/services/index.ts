@@ -7,6 +7,9 @@ export {
   type GroceryItem,
   type GroceryGroup,
   type GroceryList,
+  type GroceryListItemWithStatus,
+  type PersistentGroceryList,
+  type CheckPantryResult,
 } from './grocery.service.js';
 export { PreferenceService } from './preference.service.js';
 export {
