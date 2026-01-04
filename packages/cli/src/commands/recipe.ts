@@ -6,8 +6,12 @@ import {
   migrate,
   getDefaultMigrationsDir,
   RecipeService,
+  ImportService,
+  TagRepository,
+  IngredientRepository,
   type RecipeWithRelations,
   type CreateRecipe,
+  type CreateRecipeIngredientInput,
 } from '@meals/core';
 import {
   printJson,
@@ -19,7 +23,21 @@ import {
 } from '../output.js';
 
 /**
+ * Initialize database and return a RecipeService instance along with TagRepository and IngredientRepository
+ */
+function getServices(dbPath?: string): { recipeService: RecipeService; tagRepo: TagRepository; ingredientRepo: IngredientRepository } {
+  const db = getDb({ dbPath });
+  migrate(db, getDefaultMigrationsDir());
+  return {
+    recipeService: new RecipeService(db),
+    tagRepo: new TagRepository(db),
+    ingredientRepo: new IngredientRepository(db),
+  };
+}
+
+/**
  * Initialize database and return a RecipeService instance
+ * @deprecated Use getServices() instead for operations that need tag resolution
  */
 function getService(dbPath?: string): RecipeService {
   const db = getDb({ dbPath });
@@ -39,9 +57,31 @@ function formatTime(prepMinutes: number | null, cookMinutes: number | null): str
 }
 
 /**
+ * Resolve ingredient ID to name using the ingredient repository
+ */
+function resolveIngredientName(ingredientRepo: IngredientRepository, ingredientId: string): string {
+  const ingredient = ingredientRepo.getById(ingredientId);
+  return ingredient ? ingredient.name : ingredientId;
+}
+
+/**
+ * Resolve tag IDs to names using the tag repository
+ */
+function resolveTagNames(tagRepo: TagRepository, tagIds: string[]): string[] {
+  return tagIds.map((tagId) => {
+    const tag = tagRepo.getById(tagId);
+    return tag ? tag.name : tagId;
+  });
+}
+
+/**
  * Format a recipe as markdown
  */
-function formatRecipeMarkdown(recipe: RecipeWithRelations): string {
+function formatRecipeMarkdown(
+  recipe: RecipeWithRelations,
+  ingredientRepo: IngredientRepository,
+  tagRepo: TagRepository
+): string {
   const lines: string[] = [];
 
   lines.push(`# ${recipe.title}`);
@@ -75,7 +115,8 @@ function formatRecipeMarkdown(recipe: RecipeWithRelations): string {
       const prefix = [qty, unit].filter(Boolean).join(' ');
       const notes = ing.notes ? ` (${ing.notes})` : '';
       const optional = ing.optional ? ' [optional]' : '';
-      lines.push(`- ${prefix ? prefix + ' ' : ''}${ing.ingredientId}${notes}${optional}`);
+      const ingredientName = resolveIngredientName(ingredientRepo, ing.ingredientId);
+      lines.push(`- ${prefix ? prefix + ' ' : ''}${ingredientName}${notes}${optional}`);
     }
     lines.push('');
   }
@@ -88,8 +129,9 @@ function formatRecipeMarkdown(recipe: RecipeWithRelations): string {
 
   // Tags
   if (recipe.tagIds && recipe.tagIds.length > 0) {
+    const tagNames = resolveTagNames(tagRepo, recipe.tagIds);
     lines.push('---');
-    lines.push(`Tags: ${recipe.tagIds.join(', ')}`);
+    lines.push(`Tags: ${tagNames.join(', ')}`);
     lines.push('');
   }
 
@@ -105,7 +147,11 @@ function formatRecipeMarkdown(recipe: RecipeWithRelations): string {
 /**
  * Display recipe details in a nice terminal format
  */
-function displayRecipe(recipe: RecipeWithRelations): void {
+function displayRecipe(
+  recipe: RecipeWithRelations,
+  ingredientRepo: IngredientRepository,
+  tagRepo: TagRepository
+): void {
   console.log('');
   console.log(`  ${recipe.title}`);
   console.log('  ' + '='.repeat(recipe.title.length));
@@ -139,7 +185,8 @@ function displayRecipe(recipe: RecipeWithRelations): void {
       const prefix = [qty, unit].filter(Boolean).join(' ');
       const notes = ing.notes ? ` (${ing.notes})` : '';
       const optional = ing.optional ? ' [optional]' : '';
-      console.log(`    - ${prefix ? prefix + ' ' : ''}${ing.ingredientId}${notes}${optional}`);
+      const ingredientName = resolveIngredientName(ingredientRepo, ing.ingredientId);
+      console.log(`    - ${prefix ? prefix + ' ' : ''}${ingredientName}${notes}${optional}`);
     }
     console.log('');
   }
@@ -156,7 +203,8 @@ function displayRecipe(recipe: RecipeWithRelations): void {
 
   // Tags
   if (recipe.tagIds && recipe.tagIds.length > 0) {
-    console.log(`  Tags: ${recipe.tagIds.join(', ')}`);
+    const tagNames = resolveTagNames(tagRepo, recipe.tagIds);
+    console.log(`  Tags: ${tagNames.join(', ')}`);
     console.log('');
   }
 
@@ -170,19 +218,27 @@ function displayRecipe(recipe: RecipeWithRelations): void {
   console.log('');
 }
 
+/** Parsed ingredient data from CLI input (name is not yet resolved to ID) */
+interface ParsedIngredient {
+  name: string;
+  quantity: number | null;
+  unit: string | null;
+  notes: string | null;
+}
+
 /**
  * Parse ingredient string in format "name:quantity unit" or "name:quantity:unit"
  * Examples:
- *   "pasta:400g" -> { ingredientId: "pasta", quantity: 400, unit: "g" }
- *   "olive oil:2 tbsp" -> { ingredientId: "olive oil", quantity: 2, unit: "tbsp" }
- *   "salt::" -> { ingredientId: "salt", quantity: null, unit: null }
+ *   "pasta:400g" -> { name: "pasta", quantity: 400, unit: "g" }
+ *   "olive oil:2 tbsp" -> { name: "olive oil", quantity: 2, unit: "tbsp" }
+ *   "salt::" -> { name: "salt", quantity: null, unit: null }
  */
-function parseIngredient(input: string): { ingredientId: string; quantity: number | null; unit: string | null; notes: string | null } {
+function parseIngredient(input: string): ParsedIngredient {
   const parts = input.split(':');
-  const ingredientId = parts[0]?.trim() || '';
+  const name = parts[0]?.trim() || '';
 
   if (parts.length === 1) {
-    return { ingredientId, quantity: null, unit: null, notes: null };
+    return { name, quantity: null, unit: null, notes: null };
   }
 
   const quantityPart = parts[1]?.trim() || '';
@@ -192,11 +248,11 @@ function parseIngredient(input: string): { ingredientId: string; quantity: numbe
   if (match) {
     const quantity = parseFloat(match[1]);
     const unit = match[2]?.trim() || (parts[2]?.trim() || null);
-    return { ingredientId, quantity, unit: unit || null, notes: null };
+    return { name, quantity, unit: unit || null, notes: null };
   }
 
   // If no number found, treat the whole thing as unit
-  return { ingredientId, quantity: null, unit: quantityPart || null, notes: null };
+  return { name, quantity: null, unit: quantityPart || null, notes: null };
 }
 
 /**
@@ -234,11 +290,32 @@ recipeCommand
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
 
     try {
-      const service = getService(globalOpts.db);
+      const { recipeService, tagRepo } = getServices(globalOpts.db);
 
-      const recipes = service.listRecipes({
+      // Resolve tag names to IDs for filtering
+      let tagIds: string[] | undefined;
+      if (options.tag && options.tag.length > 0) {
+        tagIds = [];
+        for (const tagName of options.tag) {
+          const tag = tagRepo.getByName(tagName);
+          if (tag) {
+            tagIds.push(tag.id);
+          } else {
+            // Tag doesn't exist, so no recipes can match this filter
+            // Return empty results immediately
+            if (globalOpts.json) {
+              printJson([]);
+            } else {
+              console.log('No recipes found.');
+            }
+            return;
+          }
+        }
+      }
+
+      const recipes = recipeService.listRecipes({
         search: options.query,
-        tagIds: options.tag,
+        tagIds,
         cuisine: options.cuisine,
         limit: parseInt(options.limit, 10),
       });
@@ -253,13 +330,13 @@ recipeCommand
 
         printTable(
           recipes.map((r) => ({
-            id: r.id.slice(0, 8) + '...',
+            id: r.id,
             title: r.title,
             time: formatTime(r.prepTimeMinutes, r.cookTimeMinutes),
             cuisine: r.cuisine || '-',
           })),
           [
-            { key: 'id', header: 'ID', width: 12 },
+            { key: 'id', header: 'ID', width: 36 },
             { key: 'title', header: 'TITLE', width: 30 },
             { key: 'time', header: 'TIME', width: 20 },
             { key: 'cuisine', header: 'CUISINE', width: 15 },
@@ -282,8 +359,8 @@ recipeCommand
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
 
     try {
-      const service = getService(globalOpts.db);
-      const recipe = service.getRecipe(id);
+      const { recipeService, tagRepo, ingredientRepo } = getServices(globalOpts.db);
+      const recipe = recipeService.getRecipe(id);
 
       if (!recipe) {
         printError(`Recipe not found: ${id}`);
@@ -293,7 +370,7 @@ recipeCommand
       if (globalOpts.json) {
         printJson(recipe);
       } else {
-        displayRecipe(recipe);
+        displayRecipe(recipe, ingredientRepo, tagRepo);
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');
@@ -308,17 +385,18 @@ recipeCommand
   .requiredOption('--title <title>', 'Recipe title')
   .requiredOption('--instructions <text>', 'Recipe instructions')
   .option('--ingredient <ingredient>', 'Ingredient (format: name:quantity unit) - can be repeated', (val: string, prev: string[] | undefined) => prev ? [...prev, val] : [val])
-  .option('--tag <tag>', 'Tag ID - can be repeated', (val: string, prev: string[] | undefined) => prev ? [...prev, val] : [val])
+  .option('--tag <tag>', 'Tag name (creates if not exists) - can be repeated', (val: string, prev: string[] | undefined) => prev ? [...prev, val] : [val])
   .option('--cuisine <cuisine>', 'Cuisine type')
   .option('--servings <n>', 'Number of servings', '4')
   .option('--prep-time <minutes>', 'Prep time in minutes')
   .option('--cook-time <minutes>', 'Cook time in minutes')
   .option('--description <text>', 'Recipe description')
+  .option('--difficulty <level>', 'Difficulty level (easy, medium, hard)')
   .action((options, command) => {
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
 
     try {
-      const service = getService(globalOpts.db);
+      const { recipeService, tagRepo, ingredientRepo } = getServices(globalOpts.db);
 
       // Build recipe data
       const recipeData: CreateRecipe = {
@@ -331,16 +409,31 @@ recipeCommand
         cuisine: options.cuisine || null,
         sourceType: 'manual',
         sourceUrl: null,
-        difficulty: null,
+        difficulty: options.difficulty || null,
       };
 
-      // Parse ingredients
-      const ingredients = options.ingredient
-        ? options.ingredient.map(parseIngredient)
+      // Parse and resolve ingredients (creates ingredients if they don't exist)
+      let ingredients: CreateRecipeIngredientInput[] | undefined;
+      if (options.ingredient) {
+        const parsedIngredients = options.ingredient.map(parseIngredient);
+        ingredients = parsedIngredients.map((parsed: ParsedIngredient): CreateRecipeIngredientInput => {
+          const ingredient = ingredientRepo.getOrCreate(parsed.name);
+          return {
+            ingredientId: ingredient.id,
+            quantity: parsed.quantity,
+            unit: parsed.unit,
+            notes: parsed.notes,
+          };
+        });
+      }
+
+      // Resolve tag names to IDs (creates tags if they don't exist)
+      const tagIds = options.tag
+        ? tagRepo.resolveTagNames(options.tag)
         : undefined;
 
       // Create recipe
-      const recipe = service.createRecipe(recipeData, ingredients, options.tag);
+      const recipe = recipeService.createRecipe(recipeData, ingredients, tagIds);
 
       if (globalOpts.json) {
         printJson(recipe);
@@ -407,15 +500,15 @@ recipeCommand
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
 
     try {
-      const service = getService(globalOpts.db);
-      const recipe = service.getRecipe(id);
+      const { recipeService, tagRepo, ingredientRepo } = getServices(globalOpts.db);
+      const recipe = recipeService.getRecipe(id);
 
       if (!recipe) {
         printError(`Recipe not found: ${id}`);
         process.exit(1);
       }
 
-      const markdown = formatRecipeMarkdown(recipe);
+      const markdown = formatRecipeMarkdown(recipe, ingredientRepo, tagRepo);
 
       if (options.output) {
         fs.writeFileSync(options.output, markdown, 'utf-8');
@@ -434,11 +527,49 @@ recipeCommand
     }
   });
 
-// Import command (placeholder - not in scope for this ticket)
+// IMPORT command
 recipeCommand
   .command('import <url>')
-  .description('Import recipe from URL')
-  .option('--no-normalize', 'Skip ingredient normalization')
-  .action((url: string) => {
-    console.log(`Not implemented yet: recipe import ${url}`);
+  .description('Import recipe from URL (supports sites with schema.org JSON-LD)')
+  .action(async (url: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const db = getDb({ dbPath: globalOpts.db });
+      migrate(db, getDefaultMigrationsDir());
+      const importService = new ImportService(db);
+
+      if (!globalOpts.json) {
+        console.log(`Importing recipe from: ${url}`);
+        console.log('');
+      }
+
+      const result = await importService.importRecipeFromUrl(url);
+
+      if (!result.success || !result.recipe) {
+        printError(result.error || 'Failed to import recipe');
+        process.exit(1);
+      }
+
+      if (globalOpts.json) {
+        printJson(result.recipe);
+      } else {
+        printSuccess(`Imported: ${result.recipe.title}`);
+        console.log(`  ID: ${result.recipe.id}`);
+        if (result.recipe.servings) {
+          console.log(`  Servings: ${result.recipe.servings}`);
+        }
+        if (result.recipe.prepTimeMinutes) {
+          console.log(`  Prep time: ${result.recipe.prepTimeMinutes} min`);
+        }
+        if (result.recipe.cookTimeMinutes) {
+          console.log(`  Cook time: ${result.recipe.cookTimeMinutes} min`);
+        }
+        console.log('');
+        console.log(`Use "meals recipe show ${result.recipe.id}" to view full details.`);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
   });

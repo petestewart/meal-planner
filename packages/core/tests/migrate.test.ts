@@ -2,6 +2,7 @@
  * Unit tests for database migration system
  */
 
+import { test, expect } from 'vitest';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -22,60 +23,6 @@ function cleanupDir(dir: string): void {
   }
 }
 
-// Test runner (simple, no dependencies)
-interface TestResult {
-  name: string;
-  passed: boolean;
-  error?: Error;
-}
-
-const tests: Array<{ name: string; fn: () => void | Promise<void> }> = [];
-
-function test(name: string, fn: () => void | Promise<void>): void {
-  tests.push({ name, fn });
-}
-
-async function runTests(): Promise<void> {
-  const results: TestResult[] = [];
-
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      results.push({ name, passed: true });
-      console.log(`  PASS: ${name}`);
-    } catch (error) {
-      results.push({ name, passed: false, error: error as Error });
-      console.log(`  FAIL: ${name}`);
-      console.log(`        ${(error as Error).message}`);
-    }
-  }
-
-  const passed = results.filter((r) => r.passed).length;
-  const failed = results.filter((r) => !r.passed).length;
-
-  console.log('');
-  console.log(`Results: ${passed} passed, ${failed} failed`);
-
-  if (failed > 0) {
-    process.exit(1);
-  }
-}
-
-// Assertions
-function assert(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(`Assertion failed: ${message}`);
-  }
-}
-
-function assertEqual<T>(actual: T, expected: T, message: string): void {
-  if (actual !== expected) {
-    throw new Error(`${message}: expected ${expected}, got ${actual}`);
-  }
-}
-
-// Tests
-
 test('migrate creates schema_migrations table', () => {
   const db = getDb({ dbPath: ':memory:' });
   const tmpDir = randomTmpDir();
@@ -93,7 +40,7 @@ test('migrate creates schema_migrations table', () => {
       )
       .get();
 
-    assert(tableExists !== undefined, 'schema_migrations table should exist');
+    expect(tableExists).toBeDefined();
   } finally {
     closeDb(db);
     cleanupDir(tmpDir);
@@ -119,7 +66,7 @@ test('migrate applies migrations in order', () => {
 
     const applied = migrate(db, tmpDir);
 
-    assertEqual(applied, 2, 'should apply 2 migrations');
+    expect(applied).toBe(2);
 
     // Verify tables exist
     const tables = db
@@ -127,12 +74,9 @@ test('migrate applies migrations in order', () => {
       .all() as Array<{ name: string }>;
 
     const tableNames = tables.map((t) => t.name);
-    assert(tableNames.includes('first_table'), 'first_table should exist');
-    assert(tableNames.includes('second_table'), 'second_table should exist');
-    assert(
-      tableNames.includes('schema_migrations'),
-      'schema_migrations should exist'
-    );
+    expect(tableNames).toContain('first_table');
+    expect(tableNames).toContain('second_table');
+    expect(tableNames).toContain('schema_migrations');
   } finally {
     closeDb(db);
     cleanupDir(tmpDir);
@@ -153,16 +97,16 @@ test('migrate skips already-applied migrations', () => {
 
     // First run
     const firstRun = migrate(db, tmpDir);
-    assertEqual(firstRun, 1, 'first run should apply 1 migration');
+    expect(firstRun).toBe(1);
 
     // Second run - should skip
     const secondRun = migrate(db, tmpDir);
-    assertEqual(secondRun, 0, 'second run should apply 0 migrations');
+    expect(secondRun).toBe(0);
 
     // Verify only one entry in schema_migrations
     const migrations = getAppliedMigrations(db);
-    assertEqual(migrations.length, 1, 'should have 1 migration record');
-    assertEqual(migrations[0].version, 1, 'version should be 1');
+    expect(migrations.length).toBe(1);
+    expect(migrations[0].version).toBe(1);
   } finally {
     closeDb(db);
     cleanupDir(tmpDir);
@@ -185,14 +129,7 @@ test('migrate is transactional - rolls back on failure', () => {
       `
     );
 
-    let errorThrown = false;
-    try {
-      migrate(db, tmpDir);
-    } catch {
-      errorThrown = true;
-    }
-
-    assert(errorThrown, 'should throw error on bad migration');
+    expect(() => migrate(db, tmpDir)).toThrow();
 
     // Verify table was NOT created (rolled back)
     const tableExists = db
@@ -201,11 +138,11 @@ test('migrate is transactional - rolls back on failure', () => {
       )
       .get();
 
-    assert(tableExists === undefined, 'good_table should not exist (rolled back)');
+    expect(tableExists).toBeUndefined();
 
     // Verify no migration was recorded
     const migrations = getAppliedMigrations(db);
-    assertEqual(migrations.length, 0, 'should have 0 migration records');
+    expect(migrations.length).toBe(0);
   } finally {
     closeDb(db);
     cleanupDir(tmpDir);
@@ -218,7 +155,7 @@ test('migrate handles missing directory gracefully', () => {
 
   try {
     const applied = migrate(db, tmpDir);
-    assertEqual(applied, 0, 'should apply 0 migrations for missing dir');
+    expect(applied).toBe(0);
   } finally {
     closeDb(db);
   }
@@ -241,7 +178,7 @@ test('migrate skips files without version prefix', () => {
     );
 
     const applied = migrate(db, tmpDir);
-    assertEqual(applied, 1, 'should only apply 1 migration');
+    expect(applied).toBe(1);
 
     const tableExists = db
       .prepare(
@@ -249,10 +186,7 @@ test('migrate skips files without version prefix', () => {
       )
       .get();
 
-    assert(
-      tableExists === undefined,
-      'table from non-prefixed file should not exist'
-    );
+    expect(tableExists).toBeUndefined();
   } finally {
     closeDb(db);
     cleanupDir(tmpDir);
@@ -264,7 +198,7 @@ test('getAppliedMigrations returns empty array when table does not exist', () =>
 
   try {
     const migrations = getAppliedMigrations(db);
-    assertEqual(migrations.length, 0, 'should return empty array');
+    expect(migrations.length).toBe(0);
   } finally {
     closeDb(db);
   }
@@ -284,16 +218,13 @@ test('getAppliedMigrations returns applied migrations in order', () => {
     migrate(db, tmpDir);
 
     const migrations = getAppliedMigrations(db);
-    assertEqual(migrations.length, 3, 'should have 3 migrations');
-    assertEqual(migrations[0].version, 1, 'first should be version 1');
-    assertEqual(migrations[1].version, 2, 'second should be version 2');
-    assertEqual(migrations[2].version, 3, 'third should be version 3');
+    expect(migrations.length).toBe(3);
+    expect(migrations[0].version).toBe(1);
+    expect(migrations[1].version).toBe(2);
+    expect(migrations[2].version).toBe(3);
 
     // Verify appliedAt is a valid timestamp
-    assert(
-      migrations[0].appliedAt.match(/^\d{4}-\d{2}-\d{2}/) !== null,
-      'appliedAt should be a valid date string'
-    );
+    expect(migrations[0].appliedAt).toMatch(/^\d{4}-\d{2}-\d{2}/);
   } finally {
     closeDb(db);
     cleanupDir(tmpDir);
@@ -306,7 +237,7 @@ test('001_initial.sql creates all required tables', () => {
 
   try {
     const applied = migrate(db, migrationsDir);
-    assert(applied >= 1, 'should apply at least 1 migration');
+    expect(applied).toBeGreaterThanOrEqual(1);
 
     // Expected tables from Deliverable B
     const expectedTables = [
@@ -329,7 +260,7 @@ test('001_initial.sql creates all required tables', () => {
     const tableNames = tables.map((t) => t.name);
 
     for (const table of expectedTables) {
-      assert(tableNames.includes(table), `table '${table}' should exist`);
+      expect(tableNames).toContain(table);
     }
   } finally {
     closeDb(db);
@@ -365,7 +296,7 @@ test('001_initial.sql creates all required indexes', () => {
     const indexNames = indexes.map((i) => i.name);
 
     for (const index of expectedIndexes) {
-      assert(indexNames.includes(index), `index '${index}' should exist`);
+      expect(indexNames).toContain(index);
     }
   } finally {
     closeDb(db);
@@ -386,7 +317,7 @@ test('001_initial.sql creates FTS5 virtual table', () => {
       )
       .get();
 
-    assert(ftsTable !== undefined, 'recipes_fts virtual table should exist');
+    expect(ftsTable).toBeDefined();
   } finally {
     closeDb(db);
   }
@@ -409,7 +340,7 @@ test('001_initial.sql creates FTS triggers', () => {
     const triggerNames = triggers.map((t) => t.name);
 
     for (const trigger of expectedTriggers) {
-      assert(triggerNames.includes(trigger), `trigger '${trigger}' should exist`);
+      expect(triggerNames).toContain(trigger);
     }
   } finally {
     closeDb(db);
@@ -433,7 +364,7 @@ test('FTS triggers work correctly for insert, update, delete', () => {
     const searchResult = db
       .prepare("SELECT * FROM recipes_fts WHERE recipes_fts MATCH 'carbonara'")
       .all() as Array<{ title: string }>;
-    assertEqual(searchResult.length, 1, 'should find 1 result after insert');
+    expect(searchResult.length).toBe(1);
 
     // Update the recipe
     db.prepare(
@@ -444,13 +375,13 @@ test('FTS triggers work correctly for insert, update, delete', () => {
     const updatedResult = db
       .prepare("SELECT * FROM recipes_fts WHERE recipes_fts MATCH 'updated'")
       .all() as Array<{ title: string }>;
-    assertEqual(updatedResult.length, 1, 'should find 1 result after update');
+    expect(updatedResult.length).toBe(1);
 
     // Old search should not find it
     const oldSearch = db
       .prepare("SELECT * FROM recipes_fts WHERE recipes_fts MATCH 'spaghetti'")
       .all();
-    assertEqual(oldSearch.length, 0, 'should not find old title after update');
+    expect(oldSearch.length).toBe(0);
 
     // Delete the recipe
     db.prepare("DELETE FROM recipes WHERE id = 'test-1'").run();
@@ -459,13 +390,8 @@ test('FTS triggers work correctly for insert, update, delete', () => {
     const afterDelete = db
       .prepare("SELECT * FROM recipes_fts WHERE recipes_fts MATCH 'carbonara'")
       .all();
-    assertEqual(afterDelete.length, 0, 'should not find result after delete');
+    expect(afterDelete.length).toBe(0);
   } finally {
     closeDb(db);
   }
 });
-
-// Run all tests
-console.log('Running migration system tests...');
-console.log('');
-runTests();

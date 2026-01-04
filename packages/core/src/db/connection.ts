@@ -10,11 +10,22 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
+/**
+ * Resolve the default database path.
+ * Priority: MEALS_DB_PATH env var > import.meta.dirname-based path > process.cwd()-based path
+ */
+function resolveDefaultDbPath(): string {
+  // Allow environment variable override for flexibility
+  if (process.env.MEALS_DB_PATH) {
+    return resolve(process.env.MEALS_DB_PATH);
+  }
+  // Use import.meta.dirname if available (Node.js 20.11+), otherwise fall back to cwd
+  const baseDir = import.meta.dirname ?? process.cwd();
+  return resolve(baseDir, '../../../data/meals.db');
+}
+
 /** Default database path relative to project root */
-const DEFAULT_DB_PATH = resolve(
-  import.meta.dirname ?? process.cwd(),
-  '../../../data/meals.db'
-);
+const DEFAULT_DB_PATH = resolveDefaultDbPath();
 
 /** Singleton database instance */
 let dbInstance: DatabaseType | null = null;

@@ -6,13 +6,16 @@ import {
   getDefaultMigrationsDir,
   PlanService,
   RecipeService,
+  SuggestionService,
   type MealType,
   type WeeklyPlanWithItems,
+  type RecipeSuggestion,
 } from '@meals/core';
 import {
   printJson,
   printSuccess,
   printError,
+  printInfo,
   getGlobalOptions,
   type GlobalOptions,
 } from '../output.js';
@@ -33,6 +36,15 @@ function getRecipeService(dbPath?: string): RecipeService {
   const db = getDb({ dbPath });
   migrate(db, getDefaultMigrationsDir());
   return new RecipeService(db);
+}
+
+/**
+ * Initialize database and return a SuggestionService instance
+ */
+function getSuggestionService(dbPath?: string): SuggestionService {
+  const db = getDb({ dbPath });
+  migrate(db, getDefaultMigrationsDir());
+  return new SuggestionService(db);
 }
 
 /**
@@ -251,6 +263,67 @@ function formatPlanMarkdown(plan: WeeklyPlanWithItems, recipeService: RecipeServ
   return lines.join('\n');
 }
 
+/**
+ * Display suggestions in a nice format
+ */
+function displaySuggestions(
+  suggestions: RecipeSuggestion[],
+  context: { dayOfWeek?: number; mealType?: MealType; header?: string }
+): void {
+  const { dayOfWeek, mealType, header } = context;
+
+  console.log('');
+  if (header) {
+    console.log(header);
+    console.log('-'.repeat(header.length));
+  } else if (dayOfWeek !== undefined && mealType) {
+    const dayName = getDayName(dayOfWeek);
+    console.log(`Suggestions for ${dayName} ${mealType}:`);
+    console.log('-'.repeat(30));
+  }
+  console.log('');
+
+  if (suggestions.length === 0) {
+    console.log('  No suggestions available.');
+    console.log('');
+    return;
+  }
+
+  for (let i = 0; i < suggestions.length; i++) {
+    const suggestion = suggestions[i];
+    const recipe = suggestion.recipe;
+
+    // Recipe name
+    console.log(`${i + 1}. ${recipe.title}`);
+
+    // Score
+    console.log(`   Score: ${suggestion.score.toFixed(2)} (higher is better)`);
+
+    // Reasoning - show all reasons except base score
+    const significantReasons = suggestion.reasons.filter(r => r.type !== 'base');
+    if (significantReasons.length > 0) {
+      console.log('   Reasoning:');
+      for (const reason of significantReasons) {
+        const sign = reason.scoreImpact >= 0 ? '+' : '';
+        console.log(`     - ${reason.description} (${sign}${reason.scoreImpact.toFixed(2)})`);
+      }
+    } else {
+      console.log('   Reasoning: Base score (no special factors)');
+    }
+
+    // Additional recipe info
+    const info: string[] = [];
+    if (recipe.cuisine) info.push(recipe.cuisine);
+    if (recipe.prepTimeMinutes) info.push(`${recipe.prepTimeMinutes} min prep`);
+    if (recipe.difficulty) info.push(recipe.difficulty);
+    if (info.length > 0) {
+      console.log(`   (${info.join(', ')})`);
+    }
+
+    console.log('');
+  }
+}
+
 export const planCommand = new Command('plan')
   .description('Weekly plan management')
   .action(() => {
@@ -340,14 +413,181 @@ planCommand
     }
   });
 
-// SUGGEST command (placeholder)
+// SUGGEST command
 planCommand
   .command('suggest [week]')
-  .description('Get AI suggestions to fill empty slots')
-  .option('--max-prep <minutes>', 'Maximum prep time in minutes')
-  .option('--cuisine <cuisine...>', 'Preferred cuisines')
-  .action(() => {
-    console.log('Meal suggestion feature coming soon.');
+  .description('Get suggestions to fill empty slots')
+  .option('--limit <n>', 'Number of suggestions per slot', '3')
+  .option('--day <day>', 'Only suggest for specific day (mon-sun)')
+  .option('--meal <meal>', 'Only suggest for specific meal (breakfast/lunch/dinner)')
+  .action((week: string | undefined, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const planService = getPlanService(globalOpts.db);
+      const suggestionService = getSuggestionService(globalOpts.db);
+
+      // Get the plan
+      let plan: WeeklyPlanWithItems | null;
+      let isoWeek: string;
+
+      if (week) {
+        isoWeek = parseWeek(week);
+        plan = planService.getPlanByWeek(isoWeek);
+      } else {
+        // Get active plan or current week's plan
+        const plans = planService.listPlans({ status: 'active', limit: 1 });
+        if (plans.length > 0) {
+          plan = plans[0];
+          isoWeek = plan.week;
+        } else {
+          // Try to get this week's plan
+          isoWeek = getIsoWeek(new Date());
+          plan = planService.getPlanByWeek(isoWeek);
+        }
+      }
+
+      const limit = parseInt(options.limit, 10) || 3;
+
+      // If no plan exists, create one so we can still suggest
+      if (!plan) {
+        plan = planService.createPlan({
+          week: isoWeek!,
+          status: 'draft',
+          notes: null,
+        });
+        if (!globalOpts.json) {
+          printInfo(`Created new plan for week ${isoWeek}`);
+        }
+      }
+
+      // Build a lookup of existing meals
+      const existingMeals = new Map<string, string>();
+      if (plan.items) {
+        for (const item of plan.items) {
+          if (item.recipeId) {
+            const key = `${item.dayOfWeek}-${item.mealType}`;
+            existingMeals.set(key, item.recipeId);
+          }
+        }
+      }
+
+      // Determine which slots to suggest for
+      const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner'];
+      const slotsToFill: Array<{ dayOfWeek: number; mealType: MealType }> = [];
+
+      if (options.day && options.meal) {
+        // Specific slot
+        const dayOfWeek = parseDay(options.day);
+        const mealType = parseMealType(options.meal);
+        const key = `${dayOfWeek}-${mealType}`;
+        if (!existingMeals.has(key)) {
+          slotsToFill.push({ dayOfWeek, mealType });
+        }
+      } else if (options.day) {
+        // All meals for a specific day
+        const dayOfWeek = parseDay(options.day);
+        for (const mealType of mealTypes) {
+          const key = `${dayOfWeek}-${mealType}`;
+          if (!existingMeals.has(key)) {
+            slotsToFill.push({ dayOfWeek, mealType });
+          }
+        }
+      } else if (options.meal) {
+        // Specific meal type for all days
+        const mealType = parseMealType(options.meal);
+        for (let day = 1; day <= 7; day++) {
+          const key = `${day}-${mealType}`;
+          if (!existingMeals.has(key)) {
+            slotsToFill.push({ dayOfWeek: day, mealType });
+          }
+        }
+      } else {
+        // All empty slots
+        for (let day = 1; day <= 7; day++) {
+          for (const mealType of mealTypes) {
+            const key = `${day}-${mealType}`;
+            if (!existingMeals.has(key)) {
+              slotsToFill.push({ dayOfWeek: day, mealType });
+            }
+          }
+        }
+      }
+
+      if (slotsToFill.length === 0) {
+        if (globalOpts.json) {
+          printJson({ week: plan.week, suggestions: [], message: 'All slots are filled' });
+        } else {
+          console.log('');
+          console.log(`Week ${plan.week}: All meal slots are already filled.`);
+          console.log('');
+        }
+        return;
+      }
+
+      // Get suggestions for each empty slot
+      const allSuggestions: Array<{
+        dayOfWeek: number;
+        mealType: MealType;
+        suggestions: RecipeSuggestion[];
+      }> = [];
+
+      for (const slot of slotsToFill) {
+        const suggestions = suggestionService.getSuggestions(
+          slot.dayOfWeek,
+          slot.mealType,
+          {
+            limit,
+            planId: plan.id,
+          }
+        );
+
+        allSuggestions.push({
+          dayOfWeek: slot.dayOfWeek,
+          mealType: slot.mealType,
+          suggestions,
+        });
+      }
+
+      if (globalOpts.json) {
+        printJson({
+          week: plan.week,
+          slots: allSuggestions.map(s => ({
+            dayOfWeek: s.dayOfWeek,
+            day: getDayName(s.dayOfWeek),
+            mealType: s.mealType,
+            suggestions: s.suggestions.map(sg => ({
+              recipeId: sg.recipe.id,
+              title: sg.recipe.title,
+              score: sg.score,
+              cuisine: sg.recipe.cuisine,
+              prepTime: sg.recipe.prepTimeMinutes,
+              reasons: sg.reasons,
+            })),
+          })),
+        });
+      } else {
+        console.log('');
+        console.log(`Meal Suggestions for Week ${plan.week}`);
+        console.log('='.repeat(40));
+
+        for (const slot of allSuggestions) {
+          displaySuggestions(slot.suggestions, {
+            dayOfWeek: slot.dayOfWeek,
+            mealType: slot.mealType,
+          });
+        }
+
+        // Show tip about setting a meal
+        if (allSuggestions.some(s => s.suggestions.length > 0)) {
+          console.log('Tip: Use "meals plan set <week> <day> <meal> <recipe-id>" to assign a suggestion.');
+          console.log('');
+        }
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
   });
 
 // SET command
@@ -414,13 +654,104 @@ planCommand
     }
   });
 
-// SWAP command (placeholder)
+// SWAP command
 planCommand
   .command('swap <week> <day> <meal>')
-  .description('Swap a meal (get alternatives)')
-  .option('-r, --reason <text>', 'Reason for swapping')
-  .action(() => {
-    console.log('Meal suggestion feature coming soon.');
+  .description('Get alternatives for an existing meal')
+  .option('-r, --reason <text>', 'Reason for swapping (e.g., "want something simpler", "missing ingredients")')
+  .option('--limit <n>', 'Number of alternatives to show', '3')
+  .action((week: string, day: string, meal: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const isoWeek = parseWeek(week);
+      const dayOfWeek = parseDay(day);
+      const mealType = parseMealType(meal);
+      const limit = parseInt(options.limit, 10) || 3;
+
+      const planService = getPlanService(globalOpts.db);
+      const recipeService = getRecipeService(globalOpts.db);
+      const suggestionService = getSuggestionService(globalOpts.db);
+
+      // Get the plan
+      const plan = planService.getPlanByWeek(isoWeek);
+      if (!plan) {
+        printError(`No plan found for week ${isoWeek}`);
+        process.exit(1);
+      }
+
+      // Find the current meal for this slot
+      const currentMeal = plan.items?.find(
+        item => item.dayOfWeek === dayOfWeek && item.mealType === mealType
+      );
+
+      if (!currentMeal?.recipeId) {
+        printError(
+          `No meal set for ${getDayName(dayOfWeek)} ${mealType}. ` +
+          `Use "meals plan suggest" to get suggestions for empty slots.`
+        );
+        process.exit(1);
+      }
+
+      // Get the current recipe for display
+      const currentRecipe = recipeService.getRecipe(currentMeal.recipeId);
+      const currentTitle = currentRecipe?.title ?? currentMeal.recipeId;
+
+      // Get swap alternatives
+      const alternatives = suggestionService.getSwapAlternatives(
+        plan.id,
+        dayOfWeek,
+        mealType,
+        currentMeal.recipeId,
+        options.reason,
+        limit
+      );
+
+      if (globalOpts.json) {
+        printJson({
+          week: plan.week,
+          day: getDayName(dayOfWeek),
+          dayOfWeek,
+          mealType,
+          currentRecipe: {
+            id: currentMeal.recipeId,
+            title: currentTitle,
+          },
+          reason: options.reason ?? null,
+          alternatives: alternatives.map(alt => ({
+            recipeId: alt.recipe.id,
+            title: alt.recipe.title,
+            score: alt.score,
+            cuisine: alt.recipe.cuisine,
+            prepTime: alt.recipe.prepTimeMinutes,
+            reasons: alt.reasons,
+          })),
+        });
+      } else {
+        const dayName = getDayName(dayOfWeek);
+
+        console.log('');
+        console.log(`Swap Alternatives for ${dayName} ${mealType}`);
+        console.log('='.repeat(40));
+        console.log('');
+        console.log(`Current: ${currentTitle}`);
+        if (options.reason) {
+          console.log(`Reason: ${options.reason}`);
+        }
+
+        displaySuggestions(alternatives, {
+          header: 'Alternatives:',
+        });
+
+        if (alternatives.length > 0) {
+          console.log(`Tip: Use "meals plan set ${isoWeek} ${day} ${meal} <recipe-id>" to swap.`);
+          console.log('');
+        }
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
   });
 
 // ACTIVATE command

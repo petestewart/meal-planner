@@ -11,12 +11,13 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/db/migrations dist/db/",
     "clean": "rm -rf dist",
-    "test": "node --import tsx tests/connection.test.ts && node --import tsx tests/migrate.test.ts && node --import tsx tests/models.test.ts && node --import tsx tests/recipe.repo.test.ts && node --import tsx tests/recipe.service.test.ts && node --import tsx tests/plan.repo.test.ts && node --import tsx tests/plan.service.test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "better-sqlite3": "^12.5.0",
+    "cheerio": "^1.1.2",
     "uuid": "^13.0.0",
     "zod": "^4.3.4"
   },

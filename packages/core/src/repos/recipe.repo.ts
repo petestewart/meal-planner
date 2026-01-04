@@ -222,13 +222,33 @@ export class RecipeRepository {
 
   /**
    * List recipes with optional filters
+   *
+   * When search is provided, uses FTS5 for full-text search and orders
+   * results by relevance (FTS5 rank). Otherwise, orders by created_at.
    */
   list(options: ListRecipesOptions = {}): RecipeWithRelations[] {
     const { cuisine, difficulty, tagIds, search, limit, offset } = options;
 
-    let sql = 'SELECT DISTINCT r.* FROM recipes r';
     const params: (string | number)[] = [];
     const conditions: string[] = [];
+    let sql: string;
+    let orderBy: string;
+
+    if (search) {
+      // Use FTS5 join for search with relevance ranking
+      // FTS5 rank is a negative value where higher (less negative) = more relevant
+      sql = `
+        SELECT DISTINCT r.*, fts.rank as fts_rank
+        FROM recipes r
+        JOIN recipes_fts fts ON fts.rowid = r.rowid
+      `;
+      conditions.push('recipes_fts MATCH ?');
+      params.push(search);
+      orderBy = 'fts_rank'; // FTS5 rank: higher is more relevant (less negative)
+    } else {
+      sql = 'SELECT DISTINCT r.* FROM recipes r';
+      orderBy = 'r.created_at DESC';
+    }
 
     // Join with tags if filtering by tagIds
     if (tagIds && tagIds.length > 0) {
@@ -257,23 +277,11 @@ export class RecipeRepository {
       params.push(difficulty);
     }
 
-    // Full-text search
-    if (search) {
-      conditions.push(`
-        r.id IN (
-          SELECT r2.id FROM recipes r2
-          JOIN recipes_fts fts ON fts.rowid = r2.rowid
-          WHERE recipes_fts MATCH ?
-        )
-      `);
-      params.push(search);
-    }
-
     if (conditions.length > 0) {
       sql += ' WHERE ' + conditions.join(' AND ');
     }
 
-    sql += ' ORDER BY r.created_at DESC';
+    sql += ` ORDER BY ${orderBy}`;
 
     if (limit !== undefined) {
       sql += ' LIMIT ?';
@@ -453,13 +461,28 @@ export class RecipeRepository {
 
   /**
    * Count total recipes, optionally with filters
+   *
+   * When search is provided, uses FTS5 for full-text search matching.
    */
   count(options: Omit<ListRecipesOptions, 'limit' | 'offset'> = {}): number {
     const { cuisine, difficulty, tagIds, search } = options;
 
-    let sql = 'SELECT COUNT(DISTINCT r.id) as count FROM recipes r';
     const params: (string | number)[] = [];
     const conditions: string[] = [];
+    let sql: string;
+
+    if (search) {
+      // Use FTS5 join for search
+      sql = `
+        SELECT COUNT(DISTINCT r.id) as count
+        FROM recipes r
+        JOIN recipes_fts fts ON fts.rowid = r.rowid
+      `;
+      conditions.push('recipes_fts MATCH ?');
+      params.push(search);
+    } else {
+      sql = 'SELECT COUNT(DISTINCT r.id) as count FROM recipes r';
+    }
 
     if (tagIds && tagIds.length > 0) {
       for (let i = 0; i < tagIds.length; i++) {
@@ -481,17 +504,6 @@ export class RecipeRepository {
     if (difficulty) {
       conditions.push('r.difficulty = ?');
       params.push(difficulty);
-    }
-
-    if (search) {
-      conditions.push(`
-        r.id IN (
-          SELECT r2.id FROM recipes r2
-          JOIN recipes_fts fts ON fts.rowid = r2.rowid
-          WHERE recipes_fts MATCH ?
-        )
-      `);
-      params.push(search);
     }
 
     if (conditions.length > 0) {

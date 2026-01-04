@@ -19,22 +19,25 @@ meals db migrate
 
 ```bash
 # Add a breakfast recipe
-meals recipe add --name "Scrambled Eggs" \
+meals recipe add --title "Scrambled Eggs" \
   --description "Simple fluffy scrambled eggs" \
+  --instructions "Beat eggs, cook over medium heat while stirring" \
   --servings 2 \
   --prep-time 5 \
   --cook-time 5
 
 # Add a lunch recipe
-meals recipe add --name "Grilled Cheese Sandwich" \
+meals recipe add --title "Grilled Cheese Sandwich" \
   --description "Classic comfort food" \
+  --instructions "Butter bread, add cheese, grill until golden" \
   --servings 1 \
   --prep-time 5 \
   --cook-time 10
 
 # Add a dinner recipe
-meals recipe add --name "Pasta Carbonara" \
+meals recipe add --title "Pasta Carbonara" \
   --description "Creamy Italian pasta with bacon and egg" \
+  --instructions "Cook pasta, fry bacon, mix egg and parmesan, combine" \
   --servings 4 \
   --prep-time 10 \
   --cook-time 20
@@ -46,10 +49,13 @@ meals recipe add --name "Pasta Carbonara" \
 meals recipe list
 ```
 
+> **Note:** Recipe IDs are UUIDs shown in the first column of the `recipe list` output. Copy these IDs for use in subsequent commands.
+
 ## 4. View a Recipe
 
 ```bash
-meals recipe show 1
+# Use the UUID from 'recipe list' output
+meals recipe show <recipe-uuid>
 ```
 
 ## 5. Create a Weekly Plan
@@ -64,15 +70,20 @@ meals plan create this-week
 # Get the week string (e.g., 2026-W01)
 WEEK=$(date +%G-W%V)
 
-# Set Monday breakfast to Scrambled Eggs (recipe 1)
-meals plan set $WEEK mon breakfast 1
+# First, get the recipe UUIDs from 'meals recipe list'
+# Then use them in the commands below:
 
-# Set Monday lunch to Grilled Cheese (recipe 2)
-meals plan set $WEEK mon lunch 2
+# Set Monday breakfast to Scrambled Eggs
+meals plan set $WEEK mon breakfast <scrambled-eggs-uuid>
 
-# Set Monday dinner to Pasta Carbonara (recipe 3)
-meals plan set $WEEK mon dinner 3
+# Set Monday lunch to Grilled Cheese
+meals plan set $WEEK mon lunch <grilled-cheese-uuid>
+
+# Set Monday dinner to Pasta Carbonara
+meals plan set $WEEK mon dinner <pasta-carbonara-uuid>
 ```
+
+> **Tip:** Run `meals recipe list` to see all recipes with their UUIDs in the first column.
 
 ## 7. View the Plan
 
@@ -90,7 +101,8 @@ cat plan.md
 ## 9. Export a Recipe
 
 ```bash
-meals recipe export 1 --output scrambled-eggs.md
+# Use the UUID for "Scrambled Eggs" from 'recipe list'
+meals recipe export <scrambled-eggs-uuid> --output scrambled-eggs.md
 cat scrambled-eggs.md
 ```
 
@@ -100,7 +112,7 @@ cat scrambled-eggs.md
 rm -f plan.md scrambled-eggs.md
 
 # To start fresh, delete the database:
-rm -f ~/.local/share/meals/meals.db
+rm -f packages/data/meals.db
 ```
 
 ---

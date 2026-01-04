@@ -5,71 +5,12 @@
  * and that audit entries are created for create/update/delete operations.
  */
 
+import { test, expect, describe } from 'vitest';
+
 import { getDb, closeDb } from '../src/db/connection.js';
 import { migrate, getDefaultMigrationsDir } from '../src/db/migrate.js';
 import { RecipeService } from '../src/services/recipe.service.js';
 import type { Database } from 'better-sqlite3';
-
-// Test utilities
-interface TestResult {
-  name: string;
-  passed: boolean;
-  error?: Error;
-}
-
-const tests: Array<{ name: string; fn: () => void | Promise<void> }> = [];
-
-function test(name: string, fn: () => void | Promise<void>): void {
-  tests.push({ name, fn });
-}
-
-async function runTests(): Promise<void> {
-  const results: TestResult[] = [];
-
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      results.push({ name, passed: true });
-      console.log(`  PASS: ${name}`);
-    } catch (error) {
-      results.push({ name, passed: false, error: error as Error });
-      console.log(`  FAIL: ${name}`);
-      console.log(`        ${(error as Error).message}`);
-    }
-  }
-
-  const passed = results.filter((r) => r.passed).length;
-  const failed = results.filter((r) => !r.passed).length;
-
-  console.log('');
-  console.log(`Results: ${passed} passed, ${failed} failed`);
-
-  if (failed > 0) {
-    process.exit(1);
-  }
-}
-
-// Assertions
-function assert(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(`Assertion failed: ${message}`);
-  }
-}
-
-function assertEqual<T>(actual: T, expected: T, message: string): void {
-  if (actual !== expected) {
-    throw new Error(`${message}: expected ${expected}, got ${actual}`);
-  }
-}
-
-function assertNotNull<T>(
-  value: T | null | undefined,
-  message: string
-): asserts value is T {
-  if (value === null || value === undefined) {
-    throw new Error(`${message}: expected non-null value`);
-  }
-}
 
 // Database setup helper
 function setupTestDb(): { db: Database; service: RecipeService; cleanup: () => void } {
@@ -143,9 +84,9 @@ test('createRecipe calls repo and returns recipe', () => {
       difficulty: null,
     });
 
-    assertNotNull(recipe, 'recipe should be created');
-    assertEqual(recipe.title, 'Test Recipe', 'title should match');
-    assert(recipe.id.length > 0, 'id should be generated');
+    expect(recipe).toBeDefined();
+    expect(recipe.title).toBe('Test Recipe');
+    expect(recipe.id.length > 0).toBe(true);
   } finally {
     cleanup();
   }
@@ -173,14 +114,14 @@ test('createRecipe creates audit log entry', () => {
     );
 
     const auditEntries = getAuditEntries(db, recipe.id);
-    assertEqual(auditEntries.length, 1, 'should have 1 audit entry');
-    assertEqual(auditEntries[0].action, 'create', 'action should be create');
-    assertEqual(auditEntries[0].actor, 'cli', 'actor should be cli');
-    assertEqual(auditEntries[0].entity_type, 'recipe', 'entity_type should be recipe');
-    assertEqual(auditEntries[0].entity_id, recipe.id, 'entity_id should match');
+    expect(auditEntries.length).toBe(1);
+    expect(auditEntries[0].action).toBe('create');
+    expect(auditEntries[0].actor).toBe('cli');
+    expect(auditEntries[0].entity_type).toBe('recipe');
+    expect(auditEntries[0].entity_id).toBe(recipe.id);
 
     const details = JSON.parse(auditEntries[0].details!);
-    assertEqual(details.title, 'Audited Recipe', 'details should include title');
+    expect(details.title).toBe('Audited Recipe');
   } finally {
     cleanup();
   }
@@ -211,7 +152,7 @@ test('createRecipe with ingredients logs ingredient count', () => {
 
     const auditEntries = getAuditEntries(db, recipe.id);
     const details = JSON.parse(auditEntries[0].details!);
-    assertEqual(details.ingredientCount, 1, 'ingredientCount should be 1');
+    expect(details.ingredientCount).toBe(1);
   } finally {
     cleanup();
   }
@@ -242,9 +183,9 @@ test('createRecipe with tags logs tag count', () => {
     );
 
     const auditEntries = getAuditEntries(db, recipe.id);
-    assertEqual(auditEntries[0].actor, 'agent:curator', 'actor should be agent:curator');
+    expect(auditEntries[0].actor).toBe('agent:curator');
     const details = JSON.parse(auditEntries[0].details!);
-    assertEqual(details.tagCount, 2, 'tagCount should be 2');
+    expect(details.tagCount).toBe(2);
   } finally {
     cleanup();
   }
@@ -271,12 +212,12 @@ test('getRecipe returns recipe without audit logging', () => {
 
     const fetched = service.getRecipe(created.id);
 
-    assertNotNull(fetched, 'should find recipe');
-    assertEqual(fetched.id, created.id, 'id should match');
+    expect(fetched).toBeDefined();
+    expect(fetched.id).toBe(created.id);
 
     // Verify no new audit entries were created
     const auditEntries = getAuditEntries(db, created.id);
-    assertEqual(auditEntries.length, 0, 'should have no audit entries after get');
+    expect(auditEntries.length).toBe(0);
   } finally {
     cleanup();
   }
@@ -286,7 +227,7 @@ test('getRecipe returns null for non-existent recipe', () => {
   const { service, cleanup } = setupTestDb();
   try {
     const result = service.getRecipe('non-existent-id');
-    assertEqual(result, null, 'should return null');
+    expect(result).toBe(null);
   } finally {
     cleanup();
   }
@@ -332,8 +273,8 @@ test('listRecipes returns recipes without audit logging', () => {
       db.prepare('SELECT COUNT(*) as count FROM audit_log').get() as { count: number }
     ).count;
 
-    assertEqual(recipes.length, 2, 'should have 2 recipes');
-    assertEqual(countAfter, countBefore, 'audit count should not change');
+    expect(recipes.length).toBe(2);
+    expect(countAfter).toBe(countBefore);
   } finally {
     cleanup();
   }
@@ -368,8 +309,8 @@ test('listRecipes with filters works correctly', () => {
     });
 
     const italian = service.listRecipes({ cuisine: 'Italian' });
-    assertEqual(italian.length, 1, 'should have 1 Italian recipe');
-    assertEqual(italian[0].title, 'Italian Pasta', 'should be Italian Pasta');
+    expect(italian.length).toBe(1);
+    expect(italian[0].title).toBe('Italian Pasta');
   } finally {
     cleanup();
   }
@@ -402,18 +343,18 @@ test('updateRecipe calls repo and creates audit log entry', () => {
       'user'
     );
 
-    assertNotNull(updated, 'should return updated recipe');
-    assertEqual(updated.title, 'Updated Title', 'title should be updated');
-    assertEqual(updated.servings, 6, 'servings should be updated');
+    expect(updated).toBeDefined();
+    expect(updated.title).toBe('Updated Title');
+    expect(updated.servings).toBe(6);
 
     const auditEntries = getAuditEntries(db, created.id);
-    assertEqual(auditEntries.length, 2, 'should have 2 audit entries (create + update)');
-    assertEqual(auditEntries[0].action, 'update', 'most recent should be update');
-    assertEqual(auditEntries[0].actor, 'user', 'actor should be user');
+    expect(auditEntries.length).toBe(2);
+    expect(auditEntries[0].action).toBe('update');
+    expect(auditEntries[0].actor).toBe('user');
 
     const details = JSON.parse(auditEntries[0].details!);
-    assertEqual(details.title, 'Updated Title', 'details should include title');
-    assertEqual(details.servings, 6, 'details should include servings');
+    expect(details.title).toBe('Updated Title');
+    expect(details.servings).toBe(6);
   } finally {
     cleanup();
   }
@@ -446,11 +387,11 @@ test('updateRecipe logs ingredient replacement', () => {
 
     const auditEntries = getAuditEntries(db, created.id);
     const updateEntry = auditEntries.find((e) => e.action === 'update');
-    assertNotNull(updateEntry, 'should have update entry');
+    expect(updateEntry).toBeDefined();
 
     const details = JSON.parse(updateEntry.details!);
-    assertEqual(details.ingredientsReplaced, true, 'should indicate ingredients replaced');
-    assertEqual(details.ingredientCount, 1, 'should have ingredient count');
+    expect(details.ingredientsReplaced).toBe(true);
+    expect(details.ingredientCount).toBe(1);
   } finally {
     cleanup();
   }
@@ -478,12 +419,12 @@ test('updateRecipe logs tag replacement', () => {
 
     const auditEntries = getAuditEntries(db, created.id);
     const updateEntry = auditEntries.find((e) => e.action === 'update');
-    assertNotNull(updateEntry, 'should have update entry');
-    assertEqual(updateEntry.actor, 'agent:planner', 'actor should be agent:planner');
+    expect(updateEntry).toBeDefined();
+    expect(updateEntry.actor).toBe('agent:planner');
 
     const details = JSON.parse(updateEntry.details!);
-    assertEqual(details.tagsReplaced, true, 'should indicate tags replaced');
-    assertEqual(details.tagCount, 1, 'should have tag count');
+    expect(details.tagsReplaced).toBe(true);
+    expect(details.tagCount).toBe(1);
   } finally {
     cleanup();
   }
@@ -502,8 +443,8 @@ test('updateRecipe returns null for non-existent recipe without logging', () => 
       db.prepare('SELECT COUNT(*) as count FROM audit_log').get() as { count: number }
     ).count;
 
-    assertEqual(result, null, 'should return null');
-    assertEqual(countAfter, countBefore, 'should not create audit entry');
+    expect(result).toBe(null);
+    expect(countAfter).toBe(countBefore);
   } finally {
     cleanup();
   }
@@ -527,20 +468,20 @@ test('deleteRecipe calls repo and creates audit log entry', () => {
 
     const deleted = service.deleteRecipe(created.id, 'cli');
 
-    assertEqual(deleted, true, 'delete should return true');
+    expect(deleted).toBe(true);
 
     // Recipe should be gone
     const fetched = service.getRecipe(created.id);
-    assertEqual(fetched, null, 'deleted recipe should not be found');
+    expect(fetched).toBe(null);
 
     // But audit log should have the delete entry
     const auditEntries = getAuditEntries(db, created.id);
-    assertEqual(auditEntries.length, 2, 'should have 2 audit entries (create + delete)');
-    assertEqual(auditEntries[0].action, 'delete', 'most recent should be delete');
-    assertEqual(auditEntries[0].actor, 'cli', 'actor should be cli');
+    expect(auditEntries.length).toBe(2);
+    expect(auditEntries[0].action).toBe('delete');
+    expect(auditEntries[0].actor).toBe('cli');
 
     const details = JSON.parse(auditEntries[0].details!);
-    assertEqual(details.title, 'Recipe to Delete', 'details should include title');
+    expect(details.title).toBe('Recipe to Delete');
   } finally {
     cleanup();
   }
@@ -559,8 +500,8 @@ test('deleteRecipe returns false for non-existent recipe without logging', () =>
       db.prepare('SELECT COUNT(*) as count FROM audit_log').get() as { count: number }
     ).count;
 
-    assertEqual(result, false, 'delete should return false');
-    assertEqual(countAfter, countBefore, 'should not create audit entry');
+    expect(result).toBe(false);
+    expect(countAfter).toBe(countBefore);
   } finally {
     cleanup();
   }
@@ -582,12 +523,8 @@ test('recipeExists returns correct value', () => {
       difficulty: null,
     });
 
-    assertEqual(service.recipeExists(created.id), true, 'should return true for existing');
-    assertEqual(
-      service.recipeExists('non-existent-id'),
-      false,
-      'should return false for non-existent'
-    );
+    expect(service.recipeExists(created.id)).toBe(true);
+    expect(service.recipeExists('non-existent-id')).toBe(false);
   } finally {
     cleanup();
   }
@@ -596,7 +533,7 @@ test('recipeExists returns correct value', () => {
 test('countRecipes returns correct count', () => {
   const { service, cleanup } = setupTestDb();
   try {
-    assertEqual(service.countRecipes(), 0, 'should start with 0');
+    expect(service.countRecipes()).toBe(0);
 
     service.createRecipe({
       title: 'Recipe 1',
@@ -623,7 +560,7 @@ test('countRecipes returns correct count', () => {
       difficulty: null,
     });
 
-    assertEqual(service.countRecipes(), 2, 'should have 2 recipes');
+    expect(service.countRecipes()).toBe(2);
   } finally {
     cleanup();
   }
@@ -650,9 +587,9 @@ test('getRecipeAuditLog returns audit entries for recipe', () => {
 
     const auditLog = service.getRecipeAuditLog(recipe.id);
 
-    assertEqual(auditLog.length, 3, 'should have 3 audit entries');
-    assertEqual(auditLog[0].action, 'update', 'first should be most recent update');
-    assertEqual(auditLog[2].action, 'create', 'last should be create');
+    expect(auditLog.length).toBe(3);
+    expect(auditLog[0].action).toBe('update');
+    expect(auditLog[2].action).toBe('create');
   } finally {
     cleanup();
   }
@@ -675,7 +612,7 @@ test('default actor is user when not specified', () => {
     });
 
     const auditEntries = getAuditEntries(db, recipe.id);
-    assertEqual(auditEntries[0].actor, 'user', 'default actor should be user');
+    expect(auditEntries[0].actor).toBe('user');
   } finally {
     cleanup();
   }
@@ -706,14 +643,10 @@ test('supports all actor types', () => {
       );
 
       const auditEntries = getAuditEntries(db, recipe.id);
-      assertEqual(auditEntries[0].actor, actor, `actor should be ${actor}`);
+      expect(auditEntries[0].actor).toBe(actor);
     }
   } finally {
     cleanup();
   }
 });
 
-// Run all tests
-console.log('Running RecipeService unit tests...');
-console.log('');
-runTests();

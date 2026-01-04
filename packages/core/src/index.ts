@@ -74,6 +74,22 @@ export {
   type CreatePlanItem,
   type UpdatePlanItem,
   type WeeklyPlanWithItems,
+  // Preference
+  PlanningHeuristicsSchema,
+  UserPreferencesSchema,
+  PreferenceKeyEnum,
+  DEFAULT_PREFERENCES,
+  PreferenceRowSchema,
+  SetPreferenceSchema,
+  PreferenceValueSchemas,
+  getDefaultPreference,
+  validatePreferenceValue,
+  parsePreferenceValue,
+  type PlanningHeuristics,
+  type UserPreferences,
+  type PreferenceKey,
+  type PreferenceRow,
+  type SetPreference,
 } from './models/index.js';
 
 // Repositories
@@ -88,7 +104,30 @@ export {
   type AuditLogEntry,
   PlanRepository,
   type ListPlansOptions,
+  PreferenceRepository,
+  type PreferenceData,
+  TagRepository,
+  IngredientRepository,
 } from './repos/index.js';
 
 // Services
-export { RecipeService, PlanService } from './services/index.js';
+export {
+  RecipeService,
+  PlanService,
+  GroceryService,
+  type GroceryItem,
+  type GroceryGroup,
+  type GroceryList,
+  PreferenceService,
+  ImportService,
+  type ImportedRecipeData,
+  type ImportResult,
+  type SaveImportResult,
+  SuggestionService,
+  type SuggestionReason,
+  type RecipeSuggestion,
+  type SuggestionContext,
+  type GetSuggestionsOptions,
+  SCORING_WEIGHTS,
+  RECENT_DAYS_THRESHOLD,
+} from './services/index.js';

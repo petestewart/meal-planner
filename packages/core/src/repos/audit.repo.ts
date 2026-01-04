@@ -29,6 +29,28 @@ export type AuditActor =
 export type AuditAction = 'create' | 'update' | 'delete';
 
 /**
+ * Options for flexible audit log queries.
+ */
+export interface AuditQueryOptions {
+  /** Filter by actor (exact match) */
+  actor?: string;
+  /** Filter by entity type (exact match) */
+  entityType?: string;
+  /** Filter by entity ID (exact match) */
+  entityId?: string;
+  /** Filter by action type (exact match) */
+  action?: AuditAction;
+  /** Filter entries on or after this ISO 8601 timestamp */
+  startTime?: string;
+  /** Filter entries on or before this ISO 8601 timestamp */
+  endTime?: string;
+  /** Maximum number of entries to return */
+  limit?: number;
+  /** Number of entries to skip (for pagination) */
+  offset?: number;
+}
+
+/**
  * Input for creating an audit log entry.
  */
 export interface CreateAuditLogEntry {
@@ -151,5 +173,123 @@ export class AuditRepository {
       .all(limit) as AuditLogRow[];
 
     return rows.map(rowToAuditLogEntry);
+  }
+
+  /**
+   * Get audit log entries by actor.
+   */
+  getByActor(actor: string, limit?: number): AuditLogEntry[] {
+    let sql = 'SELECT * FROM audit_log WHERE actor = ? ORDER BY timestamp DESC';
+    const params: (string | number)[] = [actor];
+
+    if (limit !== undefined) {
+      sql += ' LIMIT ?';
+      params.push(limit);
+    }
+
+    const rows = this.db.prepare(sql).all(...params) as AuditLogRow[];
+
+    return rows.map(rowToAuditLogEntry);
+  }
+
+  /**
+   * Get audit log entries within a time range.
+   * @param startTime ISO 8601 timestamp (inclusive)
+   * @param endTime ISO 8601 timestamp (inclusive)
+   * @param limit Optional maximum number of entries
+   */
+  getByTimeRange(startTime: string, endTime: string, limit?: number): AuditLogEntry[] {
+    let sql = 'SELECT * FROM audit_log WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC';
+    const params: (string | number)[] = [startTime, endTime];
+
+    if (limit !== undefined) {
+      sql += ' LIMIT ?';
+      params.push(limit);
+    }
+
+    const rows = this.db.prepare(sql).all(...params) as AuditLogRow[];
+
+    return rows.map(rowToAuditLogEntry);
+  }
+
+  /**
+   * Build WHERE clause and parameters from query options.
+   * Helper method for query() and count().
+   */
+  private buildWhereClause(options: AuditQueryOptions): { whereClause: string; params: (string | number)[] } {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (options.actor !== undefined) {
+      conditions.push('actor = ?');
+      params.push(options.actor);
+    }
+
+    if (options.entityType !== undefined) {
+      conditions.push('entity_type = ?');
+      params.push(options.entityType);
+    }
+
+    if (options.entityId !== undefined) {
+      conditions.push('entity_id = ?');
+      params.push(options.entityId);
+    }
+
+    if (options.action !== undefined) {
+      conditions.push('action = ?');
+      params.push(options.action);
+    }
+
+    if (options.startTime !== undefined) {
+      conditions.push('timestamp >= ?');
+      params.push(options.startTime);
+    }
+
+    if (options.endTime !== undefined) {
+      conditions.push('timestamp <= ?');
+      params.push(options.endTime);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    return { whereClause, params };
+  }
+
+  /**
+   * Flexible query method with multiple filter options.
+   */
+  query(options: AuditQueryOptions = {}): AuditLogEntry[] {
+    const { whereClause, params } = this.buildWhereClause(options);
+
+    let sql = `SELECT * FROM audit_log ${whereClause} ORDER BY timestamp DESC`;
+
+    if (options.limit !== undefined) {
+      sql += ' LIMIT ?';
+      params.push(options.limit);
+    }
+
+    if (options.offset !== undefined) {
+      // SQLite requires LIMIT before OFFSET, default to -1 (no limit) if not specified
+      if (options.limit === undefined) {
+        sql += ' LIMIT -1';
+      }
+      sql += ' OFFSET ?';
+      params.push(options.offset);
+    }
+
+    const rows = this.db.prepare(sql).all(...params) as AuditLogRow[];
+
+    return rows.map(rowToAuditLogEntry);
+  }
+
+  /**
+   * Count audit log entries matching the given filters.
+   */
+  count(options: AuditQueryOptions = {}): number {
+    const { whereClause, params } = this.buildWhereClause(options);
+
+    const sql = `SELECT COUNT(*) as count FROM audit_log ${whereClause}`;
+    const result = this.db.prepare(sql).get(...params) as { count: number };
+
+    return result.count;
   }
 }

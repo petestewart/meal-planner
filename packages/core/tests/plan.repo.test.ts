@@ -4,71 +4,12 @@
  * Tests all CRUD operations against an in-memory SQLite database.
  */
 
+import { test, expect, describe } from 'vitest';
+
 import { getDb, closeDb } from '../src/db/connection.js';
 import { migrate, getDefaultMigrationsDir } from '../src/db/migrate.js';
 import { PlanRepository } from '../src/repos/plan.repo.js';
 import type { Database } from 'better-sqlite3';
-
-// Test utilities
-interface TestResult {
-  name: string;
-  passed: boolean;
-  error?: Error;
-}
-
-const tests: Array<{ name: string; fn: () => void | Promise<void> }> = [];
-
-function test(name: string, fn: () => void | Promise<void>): void {
-  tests.push({ name, fn });
-}
-
-async function runTests(): Promise<void> {
-  const results: TestResult[] = [];
-
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      results.push({ name, passed: true });
-      console.log(`  PASS: ${name}`);
-    } catch (error) {
-      results.push({ name, passed: false, error: error as Error });
-      console.log(`  FAIL: ${name}`);
-      console.log(`        ${(error as Error).message}`);
-    }
-  }
-
-  const passed = results.filter((r) => r.passed).length;
-  const failed = results.filter((r) => !r.passed).length;
-
-  console.log('');
-  console.log(`Results: ${passed} passed, ${failed} failed`);
-
-  if (failed > 0) {
-    process.exit(1);
-  }
-}
-
-// Assertions
-function assert(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(`Assertion failed: ${message}`);
-  }
-}
-
-function assertEqual<T>(actual: T, expected: T, message: string): void {
-  if (actual !== expected) {
-    throw new Error(`${message}: expected ${expected}, got ${actual}`);
-  }
-}
-
-function assertNotNull<T>(
-  value: T | null | undefined,
-  message: string
-): asserts value is T {
-  if (value === null || value === undefined) {
-    throw new Error(`${message}: expected non-null value`);
-  }
-}
 
 // Database setup helper
 function setupTestDb(): { db: Database; repo: PlanRepository; cleanup: () => void } {
@@ -104,15 +45,15 @@ test('can create a weekly plan', () => {
       notes: null,
     });
 
-    assertNotNull(plan, 'plan should be created');
-    assertEqual(plan.week, '2025-W02', 'week should match');
-    assertEqual(plan.status, 'draft', 'default status should be draft');
-    assertEqual(plan.notes, null, 'notes should be null');
-    assert(plan.id.length > 0, 'id should be generated');
-    assert(plan.createdAt.length > 0, 'createdAt should be set');
-    assert(plan.updatedAt.length > 0, 'updatedAt should be set');
-    assert(Array.isArray(plan.items), 'items should be an array');
-    assertEqual(plan.items?.length, 0, 'items should be empty initially');
+    expect(plan).toBeDefined();
+    expect(plan.week).toBe('2025-W02');
+    expect(plan.status).toBe('draft');
+    expect(plan.notes).toBe(null);
+    expect(plan.id.length > 0).toBe(true);
+    expect(plan.createdAt.length > 0).toBe(true);
+    expect(plan.updatedAt.length > 0).toBe(true);
+    expect(Array.isArray(plan.items)).toBe(true);
+    expect(plan.items?.length).toBe(0);
   } finally {
     cleanup();
   }
@@ -127,9 +68,9 @@ test('can create a weekly plan with custom status and notes', () => {
       notes: 'Vacation week',
     });
 
-    assertEqual(plan.week, '2025-W03', 'week should match');
-    assertEqual(plan.status, 'active', 'status should be active');
-    assertEqual(plan.notes, 'Vacation week', 'notes should match');
+    expect(plan.week).toBe('2025-W03');
+    expect(plan.status).toBe('active');
+    expect(plan.notes).toBe('Vacation week');
   } finally {
     cleanup();
   }
@@ -145,9 +86,9 @@ test('can get plan by ID', () => {
 
     const fetched = repo.getById(created.id);
 
-    assertNotNull(fetched, 'should find plan');
-    assertEqual(fetched.id, created.id, 'id should match');
-    assertEqual(fetched.week, '2025-W04', 'week should match');
+    expect(fetched).toBeDefined();
+    expect(fetched.id).toBe(created.id);
+    expect(fetched.week).toBe('2025-W04');
   } finally {
     cleanup();
   }
@@ -157,7 +98,7 @@ test('getById returns null for non-existent plan', () => {
   const { repo, cleanup } = setupTestDb();
   try {
     const result = repo.getById('non-existent-id');
-    assertEqual(result, null, 'should return null for non-existent plan');
+    expect(result).toBe(null);
   } finally {
     cleanup();
   }
@@ -173,9 +114,9 @@ test('can get plan by week', () => {
 
     const fetched = repo.getByWeek('2025-W05');
 
-    assertNotNull(fetched, 'should find plan by week');
-    assertEqual(fetched.id, created.id, 'id should match');
-    assertEqual(fetched.notes, 'Test notes', 'notes should match');
+    expect(fetched).toBeDefined();
+    expect(fetched.id).toBe(created.id);
+    expect(fetched.notes).toBe('Test notes');
   } finally {
     cleanup();
   }
@@ -185,7 +126,7 @@ test('getByWeek returns null for non-existent week', () => {
   const { repo, cleanup } = setupTestDb();
   try {
     const result = repo.getByWeek('2099-W99');
-    assertEqual(result, null, 'should return null for non-existent week');
+    expect(result).toBe(null);
   } finally {
     cleanup();
   }
@@ -200,7 +141,7 @@ test('can list all plans', () => {
 
     const plans = repo.list();
 
-    assertEqual(plans.length, 3, 'should have 3 plans');
+    expect(plans.length).toBe(3);
   } finally {
     cleanup();
   }
@@ -215,9 +156,9 @@ test('list returns plans ordered by week descending', () => {
 
     const plans = repo.list();
 
-    assertEqual(plans[0].week, '2025-W03', 'first should be newest week');
-    assertEqual(plans[1].week, '2025-W02', 'second should be middle week');
-    assertEqual(plans[2].week, '2025-W01', 'third should be oldest week');
+    expect(plans[0].week).toBe('2025-W03');
+    expect(plans[1].week).toBe('2025-W02');
+    expect(plans[2].week).toBe('2025-W01');
   } finally {
     cleanup();
   }
@@ -231,13 +172,13 @@ test('can list plans with limit and offset', () => {
     }
 
     const page1 = repo.list({ limit: 2 });
-    assertEqual(page1.length, 2, 'first page should have 2 plans');
+    expect(page1.length).toBe(2);
 
     const page2 = repo.list({ limit: 2, offset: 2 });
-    assertEqual(page2.length, 2, 'second page should have 2 plans');
+    expect(page2.length).toBe(2);
 
     const page3 = repo.list({ limit: 2, offset: 4 });
-    assertEqual(page3.length, 1, 'third page should have 1 plan');
+    expect(page3.length).toBe(1);
   } finally {
     cleanup();
   }
@@ -252,13 +193,13 @@ test('can list plans filtered by status', () => {
     repo.create({ week: '2025-W04', status: 'draft', notes: null });
 
     const drafts = repo.list({ status: 'draft' });
-    assertEqual(drafts.length, 2, 'should have 2 draft plans');
+    expect(drafts.length).toBe(2);
 
     const active = repo.list({ status: 'active' });
-    assertEqual(active.length, 1, 'should have 1 active plan');
+    expect(active.length).toBe(1);
 
     const completed = repo.list({ status: 'completed' });
-    assertEqual(completed.length, 1, 'should have 1 completed plan');
+    expect(completed.length).toBe(1);
   } finally {
     cleanup();
   }
@@ -286,11 +227,11 @@ test('can update plan fields', () => {
       status: 'active',
     });
 
-    assertNotNull(updated, 'should return updated plan');
-    assertEqual(updated.notes, 'Updated notes', 'notes should be updated');
-    assertEqual(updated.status, 'active', 'status should be updated');
-    assertEqual(updated.week, '2025-W06', 'week should be preserved');
-    assert(updated.updatedAt !== oldTimestamp, 'updatedAt should change');
+    expect(updated).toBeDefined();
+    expect(updated.notes).toBe('Updated notes');
+    expect(updated.status).toBe('active');
+    expect(updated.week).toBe('2025-W06');
+    expect(updated.updatedAt !== oldTimestamp).toBe(true);
   } finally {
     cleanup();
   }
@@ -300,7 +241,7 @@ test('update returns null for non-existent plan', () => {
   const { repo, cleanup } = setupTestDb();
   try {
     const result = repo.update({ id: 'non-existent-id', notes: 'New notes' });
-    assertEqual(result, null, 'should return null for non-existent plan');
+    expect(result).toBe(null);
   } finally {
     cleanup();
   }
@@ -315,10 +256,10 @@ test('can delete plan', () => {
     });
 
     const deleted = repo.delete(created.id);
-    assertEqual(deleted, true, 'delete should return true');
+    expect(deleted).toBe(true);
 
     const fetched = repo.getById(created.id);
-    assertEqual(fetched, null, 'deleted plan should not be found');
+    expect(fetched).toBe(null);
   } finally {
     cleanup();
   }
@@ -328,7 +269,7 @@ test('delete returns false for non-existent plan', () => {
   const { repo, cleanup } = setupTestDb();
   try {
     const result = repo.delete('non-existent-id');
-    assertEqual(result, false, 'delete should return false for non-existent plan');
+    expect(result).toBe(false);
   } finally {
     cleanup();
   }
@@ -342,15 +283,15 @@ test('can set plan status', () => {
       notes: null,
     });
 
-    assertEqual(created.status, 'draft', 'should start as draft');
+    expect(created.status).toBe('draft');
 
     const updated = repo.setStatus(created.id, 'active');
-    assertNotNull(updated, 'setStatus should return plan');
-    assertEqual(updated.status, 'active', 'status should be active');
+    expect(updated).toBeDefined();
+    expect(updated.status).toBe('active');
 
     const completed = repo.setStatus(created.id, 'completed');
-    assertNotNull(completed, 'setStatus should return plan');
-    assertEqual(completed.status, 'completed', 'status should be completed');
+    expect(completed).toBeDefined();
+    expect(completed.status).toBe('completed');
   } finally {
     cleanup();
   }
@@ -364,7 +305,7 @@ test('exists returns true for existing plan', () => {
       notes: null,
     });
 
-    assertEqual(repo.exists(created.id), true, 'should return true for existing plan');
+    expect(repo.exists(created.id)).toBe(true);
   } finally {
     cleanup();
   }
@@ -373,11 +314,7 @@ test('exists returns true for existing plan', () => {
 test('exists returns false for non-existent plan', () => {
   const { repo, cleanup } = setupTestDb();
   try {
-    assertEqual(
-      repo.exists('non-existent-id'),
-      false,
-      'should return false for non-existent plan'
-    );
+    expect(repo.exists('non-existent-id')).toBe(false);
   } finally {
     cleanup();
   }
@@ -386,12 +323,12 @@ test('exists returns false for non-existent plan', () => {
 test('count returns correct number', () => {
   const { repo, cleanup } = setupTestDb();
   try {
-    assertEqual(repo.count(), 0, 'should start with 0 plans');
+    expect(repo.count()).toBe(0);
 
     repo.create({ week: '2025-W10', notes: null });
     repo.create({ week: '2025-W11', notes: null });
 
-    assertEqual(repo.count(), 2, 'should have 2 plans');
+    expect(repo.count()).toBe(2);
   } finally {
     cleanup();
   }
@@ -404,10 +341,10 @@ test('count with status filter', () => {
     repo.create({ week: '2025-W13', status: 'active', notes: null });
     repo.create({ week: '2025-W14', status: 'draft', notes: null });
 
-    assertEqual(repo.count(), 3, 'total count');
-    assertEqual(repo.count({ status: 'draft' }), 2, 'draft count');
-    assertEqual(repo.count({ status: 'active' }), 1, 'active count');
-    assertEqual(repo.count({ status: 'completed' }), 0, 'completed count');
+    expect(repo.count()).toBe(3);
+    expect(repo.count({ status: 'draft' })).toBe(2);
+    expect(repo.count({ status: 'active' })).toBe(1);
+    expect(repo.count({ status: 'completed' })).toBe(0);
   } finally {
     cleanup();
   }
@@ -425,14 +362,14 @@ test('can set a meal', () => {
 
     const meal = repo.setMeal(plan.id, 1, 'breakfast', recipeId, 2, 'Start the week right');
 
-    assertNotNull(meal, 'meal should be created');
-    assertEqual(meal.planId, plan.id, 'planId should match');
-    assertEqual(meal.dayOfWeek, 1, 'dayOfWeek should be 1 (Monday)');
-    assertEqual(meal.mealType, 'breakfast', 'mealType should be breakfast');
-    assertEqual(meal.recipeId, recipeId, 'recipeId should match');
-    assertEqual(meal.servings, 2, 'servings should be 2');
-    assertEqual(meal.notes, 'Start the week right', 'notes should match');
-    assert(meal.id.length > 0, 'id should be generated');
+    expect(meal).toBeDefined();
+    expect(meal.planId).toBe(plan.id);
+    expect(meal.dayOfWeek).toBe(1);
+    expect(meal.mealType).toBe('breakfast');
+    expect(meal.recipeId).toBe(recipeId);
+    expect(meal.servings).toBe(2);
+    expect(meal.notes).toBe('Start the week right');
+    expect(meal.id.length > 0).toBe(true);
   } finally {
     cleanup();
   }
@@ -445,10 +382,10 @@ test('can set a meal without recipe (null recipeId)', () => {
 
     const meal = repo.setMeal(plan.id, 3, 'lunch', null, 1, 'Leftovers');
 
-    assertNotNull(meal, 'meal should be created');
-    assertEqual(meal.recipeId, null, 'recipeId should be null');
-    assertEqual(meal.servings, 1, 'servings should be 1');
-    assertEqual(meal.notes, 'Leftovers', 'notes should match');
+    expect(meal).toBeDefined();
+    expect(meal.recipeId).toBe(null);
+    expect(meal.servings).toBe(1);
+    expect(meal.notes).toBe('Leftovers');
   } finally {
     cleanup();
   }
@@ -461,7 +398,7 @@ test('setMeal uses default servings when not specified', () => {
 
     const meal = repo.setMeal(plan.id, 5, 'dinner', null);
 
-    assertEqual(meal.servings, 2, 'servings should default to 2');
+    expect(meal.servings).toBe(2);
   } finally {
     cleanup();
   }
@@ -481,14 +418,14 @@ test('setMeal updates existing meal at same slot (upsert behavior)', () => {
     // Update same slot with different recipe
     const updated = repo.setMeal(plan.id, 1, 'dinner', recipe2, 6, 'Updated');
 
-    assertEqual(updated.id, initialId, 'should preserve the same ID');
-    assertEqual(updated.recipeId, recipe2, 'recipeId should be updated');
-    assertEqual(updated.servings, 6, 'servings should be updated');
-    assertEqual(updated.notes, 'Updated', 'notes should be updated');
+    expect(updated.id).toBe(initialId);
+    expect(updated.recipeId).toBe(recipe2);
+    expect(updated.servings).toBe(6);
+    expect(updated.notes).toBe('Updated');
 
     // Verify only one item exists
     const meals = repo.getMeals(plan.id);
-    assertEqual(meals.length, 1, 'should still have only one meal');
+    expect(meals.length).toBe(1);
   } finally {
     cleanup();
   }
@@ -503,10 +440,10 @@ test('can remove a meal', () => {
     repo.setMeal(plan.id, 2, 'lunch', recipeId);
 
     const removed = repo.removeMeal(plan.id, 2, 'lunch');
-    assertEqual(removed, true, 'removeMeal should return true');
+    expect(removed).toBe(true);
 
     const meal = repo.getMealBySlot(plan.id, 2, 'lunch');
-    assertEqual(meal, null, 'meal should be removed');
+    expect(meal).toBe(null);
   } finally {
     cleanup();
   }
@@ -518,7 +455,7 @@ test('removeMeal returns false for non-existent meal', () => {
     const plan = repo.create({ week: '2025-W20', notes: null });
 
     const result = repo.removeMeal(plan.id, 7, 'dinner');
-    assertEqual(result, false, 'removeMeal should return false for non-existent meal');
+    expect(result).toBe(false);
   } finally {
     cleanup();
   }
@@ -537,7 +474,7 @@ test('can get all meals for a plan', () => {
 
     const meals = repo.getMeals(plan.id);
 
-    assertEqual(meals.length, 4, 'should have 4 meals');
+    expect(meals.length).toBe(4);
   } finally {
     cleanup();
   }
@@ -557,14 +494,14 @@ test('getMeals returns meals in correct order (day, then meal type)', () => {
 
     const meals = repo.getMeals(plan.id);
 
-    assertEqual(meals[0].dayOfWeek, 1, 'first meal day');
-    assertEqual(meals[0].mealType, 'breakfast', 'first meal type');
-    assertEqual(meals[1].dayOfWeek, 1, 'second meal day');
-    assertEqual(meals[1].mealType, 'lunch', 'second meal type');
-    assertEqual(meals[2].dayOfWeek, 2, 'third meal day');
-    assertEqual(meals[2].mealType, 'breakfast', 'third meal type');
-    assertEqual(meals[3].dayOfWeek, 2, 'fourth meal day');
-    assertEqual(meals[3].mealType, 'dinner', 'fourth meal type');
+    expect(meals[0].dayOfWeek).toBe(1);
+    expect(meals[0].mealType).toBe('breakfast');
+    expect(meals[1].dayOfWeek).toBe(1);
+    expect(meals[1].mealType).toBe('lunch');
+    expect(meals[2].dayOfWeek).toBe(2);
+    expect(meals[2].mealType).toBe('breakfast');
+    expect(meals[3].dayOfWeek).toBe(2);
+    expect(meals[3].mealType).toBe('dinner');
   } finally {
     cleanup();
   }
@@ -577,7 +514,7 @@ test('getMeals returns empty array for plan with no meals', () => {
 
     const meals = repo.getMeals(plan.id);
 
-    assertEqual(meals.length, 0, 'should return empty array');
+    expect(meals.length).toBe(0);
   } finally {
     cleanup();
   }
@@ -593,10 +530,10 @@ test('can get meal by slot', () => {
 
     const meal = repo.getMealBySlot(plan.id, 3, 'dinner');
 
-    assertNotNull(meal, 'should find meal');
-    assertEqual(meal.dayOfWeek, 3, 'dayOfWeek should match');
-    assertEqual(meal.mealType, 'dinner', 'mealType should match');
-    assertEqual(meal.notes, 'Special dinner', 'notes should match');
+    expect(meal).toBeDefined();
+    expect(meal.dayOfWeek).toBe(3);
+    expect(meal.mealType).toBe('dinner');
+    expect(meal.notes).toBe('Special dinner');
   } finally {
     cleanup();
   }
@@ -609,7 +546,7 @@ test('getMealBySlot returns null for empty slot', () => {
 
     const meal = repo.getMealBySlot(plan.id, 5, 'lunch');
 
-    assertEqual(meal, null, 'should return null for empty slot');
+    expect(meal).toBe(null);
   } finally {
     cleanup();
   }
@@ -625,9 +562,9 @@ test('can get meal by ID', () => {
 
     const fetched = repo.getMealById(created.id);
 
-    assertNotNull(fetched, 'should find meal by ID');
-    assertEqual(fetched.id, created.id, 'id should match');
-    assertEqual(fetched.dayOfWeek, 6, 'dayOfWeek should match');
+    expect(fetched).toBeDefined();
+    expect(fetched.id).toBe(created.id);
+    expect(fetched.dayOfWeek).toBe(6);
   } finally {
     cleanup();
   }
@@ -637,7 +574,7 @@ test('getMealById returns null for non-existent meal', () => {
   const { repo, cleanup } = setupTestDb();
   try {
     const meal = repo.getMealById('non-existent-id');
-    assertEqual(meal, null, 'should return null for non-existent meal');
+    expect(meal).toBe(null);
   } finally {
     cleanup();
   }
@@ -657,7 +594,7 @@ test('delete plan cascades to plan items', () => {
     const beforeDelete = db
       .prepare('SELECT COUNT(*) as count FROM plan_items WHERE plan_id = ?')
       .get(plan.id) as { count: number };
-    assertEqual(beforeDelete.count, 3, 'should have 3 plan items before delete');
+    expect(beforeDelete.count).toBe(3);
 
     repo.delete(plan.id);
 
@@ -665,7 +602,7 @@ test('delete plan cascades to plan items', () => {
     const afterDelete = db
       .prepare('SELECT COUNT(*) as count FROM plan_items WHERE plan_id = ?')
       .get(plan.id) as { count: number };
-    assertEqual(afterDelete.count, 0, 'plan items should be deleted via cascade');
+    expect(afterDelete.count).toBe(0);
   } finally {
     cleanup();
   }
@@ -682,9 +619,9 @@ test('getById includes items', () => {
 
     const fetched = repo.getById(plan.id);
 
-    assertNotNull(fetched, 'should find plan');
-    assertNotNull(fetched.items, 'items should be included');
-    assertEqual(fetched.items.length, 2, 'should have 2 items');
+    expect(fetched).toBeDefined();
+    expect(fetched.items).toBeDefined();
+    expect(fetched.items.length).toBe(2);
   } finally {
     cleanup();
   }
@@ -700,9 +637,9 @@ test('getByWeek includes items', () => {
 
     const fetched = repo.getByWeek('2025-W29');
 
-    assertNotNull(fetched, 'should find plan');
-    assertNotNull(fetched.items, 'items should be included');
-    assertEqual(fetched.items.length, 1, 'should have 1 item');
+    expect(fetched).toBeDefined();
+    expect(fetched.items).toBeDefined();
+    expect(fetched.items.length).toBe(1);
   } finally {
     cleanup();
   }
@@ -722,21 +659,17 @@ test('list includes items for each plan', () => {
 
     const plans = repo.list();
 
-    assertEqual(plans.length, 2, 'should have 2 plans');
+    expect(plans.length).toBe(2);
 
     const fetchedPlan1 = plans.find((p) => p.id === plan1.id);
     const fetchedPlan2 = plans.find((p) => p.id === plan2.id);
 
-    assertNotNull(fetchedPlan1, 'should find plan1');
-    assertNotNull(fetchedPlan2, 'should find plan2');
-    assertEqual(fetchedPlan1.items?.length, 1, 'plan1 should have 1 item');
-    assertEqual(fetchedPlan2.items?.length, 2, 'plan2 should have 2 items');
+    expect(fetchedPlan1).toBeDefined();
+    expect(fetchedPlan2).toBeDefined();
+    expect(fetchedPlan1.items?.length).toBe(1);
+    expect(fetchedPlan2.items?.length).toBe(2);
   } finally {
     cleanup();
   }
 });
 
-// Run all tests
-console.log('Running PlanRepository integration tests...');
-console.log('');
-runTests();

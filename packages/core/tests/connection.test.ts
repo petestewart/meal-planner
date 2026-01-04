@@ -2,6 +2,7 @@
  * Unit tests for database connection module
  */
 
+import { test, expect } from 'vitest';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, rmSync } from 'node:fs';
@@ -25,78 +26,24 @@ function cleanup(path: string): void {
   }
 }
 
-// Test runner (simple, no dependencies)
-interface TestResult {
-  name: string;
-  passed: boolean;
-  error?: Error;
-}
-
-const tests: Array<{ name: string; fn: () => void | Promise<void> }> = [];
-
-function test(name: string, fn: () => void | Promise<void>): void {
-  tests.push({ name, fn });
-}
-
-async function runTests(): Promise<void> {
-  const results: TestResult[] = [];
-
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      results.push({ name, passed: true });
-      console.log(`  PASS: ${name}`);
-    } catch (error) {
-      results.push({ name, passed: false, error: error as Error });
-      console.log(`  FAIL: ${name}`);
-      console.log(`        ${(error as Error).message}`);
-    }
-  }
-
-  const passed = results.filter((r) => r.passed).length;
-  const failed = results.filter((r) => !r.passed).length;
-
-  console.log('');
-  console.log(`Results: ${passed} passed, ${failed} failed`);
-
-  if (failed > 0) {
-    process.exit(1);
-  }
-}
-
-// Assertions
-function assert(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(`Assertion failed: ${message}`);
-  }
-}
-
-function assertEqual<T>(actual: T, expected: T, message: string): void {
-  if (actual !== expected) {
-    throw new Error(`${message}: expected ${expected}, got ${actual}`);
-  }
-}
-
-// Tests
-
 test('can open in-memory database', () => {
   const db = getDb({ dbPath: ':memory:' });
-  assert(db.open, 'database should be open');
+  expect(db.open).toBe(true);
   closeDb(db);
-  assert(!db.open, 'database should be closed');
+  expect(db.open).toBe(false);
 });
 
 test('can create database file if missing', () => {
   const dbPath = randomDbPath();
   try {
-    assert(!existsSync(dbPath), 'database file should not exist initially');
+    expect(existsSync(dbPath)).toBe(false);
 
     const db = getDb({ dbPath, createIfMissing: true });
-    assert(db.open, 'database should be open');
-    assert(existsSync(dbPath), 'database file should be created');
+    expect(db.open).toBe(true);
+    expect(existsSync(dbPath)).toBe(true);
 
     closeDb(db);
-    assert(!db.open, 'database should be closed');
+    expect(db.open).toBe(false);
   } finally {
     cleanup(dbPath);
   }
@@ -105,11 +52,11 @@ test('can create database file if missing', () => {
 test('can create database in nested directory', () => {
   const dbPath = join(tmpdir(), `meals-test-nested-${Date.now()}`, 'subdir', 'test.db');
   try {
-    assert(!existsSync(dbPath), 'database file should not exist initially');
+    expect(existsSync(dbPath)).toBe(false);
 
     const db = getDb({ dbPath, createIfMissing: true });
-    assert(db.open, 'database should be open');
-    assert(existsSync(dbPath), 'database file should be created in nested directory');
+    expect(db.open).toBe(true);
+    expect(existsSync(dbPath)).toBe(true);
 
     closeDb(db);
   } finally {
@@ -135,9 +82,9 @@ test('can run queries on database', () => {
 
     // Query data
     const rows = db.prepare('SELECT * FROM test').all() as Array<{ id: number; name: string }>;
-    assertEqual(rows.length, 2, 'should have 2 rows');
-    assertEqual(rows[0].name, 'hello', 'first row name');
-    assertEqual(rows[1].name, 'world', 'second row name');
+    expect(rows.length).toBe(2);
+    expect(rows[0].name).toBe('hello');
+    expect(rows[1].name).toBe('world');
   } finally {
     closeDb(db);
   }
@@ -148,7 +95,7 @@ test('WAL mode is enabled for file-based databases', () => {
   try {
     const db = getDb({ dbPath });
     const result = db.pragma('journal_mode') as Array<{ journal_mode: string }>;
-    assertEqual(result[0].journal_mode, 'wal', 'journal mode should be WAL');
+    expect(result[0].journal_mode).toBe('wal');
     closeDb(db);
   } finally {
     cleanup(dbPath);
@@ -159,7 +106,7 @@ test('in-memory databases use memory journal mode', () => {
   const db = getDb({ dbPath: ':memory:' });
   try {
     const result = db.pragma('journal_mode') as Array<{ journal_mode: string }>;
-    assertEqual(result[0].journal_mode, 'memory', 'in-memory db should use memory journal mode');
+    expect(result[0].journal_mode).toBe('memory');
   } finally {
     closeDb(db);
   }
@@ -169,7 +116,7 @@ test('foreign keys are enabled', () => {
   const db = getDb({ dbPath: ':memory:' });
   try {
     const result = db.pragma('foreign_keys') as Array<{ foreign_keys: number }>;
-    assertEqual(result[0].foreign_keys, 1, 'foreign keys should be enabled');
+    expect(result[0].foreign_keys).toBe(1);
   } finally {
     closeDb(db);
   }
@@ -180,10 +127,5 @@ test('isDbOpen returns false when no connection', () => {
   // We can't reliably test this without resetting global state
   // So we'll just verify the function exists and returns a boolean
   const result = isDbOpen();
-  assert(typeof result === 'boolean', 'isDbOpen should return a boolean');
+  expect(typeof result).toBe('boolean');
 });
-
-// Run all tests
-console.log('Running database connection tests...');
-console.log('');
-runTests();

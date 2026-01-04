@@ -71,3 +71,22 @@ export {
   type UpdatePlanItem,
   type WeeklyPlanWithItems,
 } from './plan.js';
+
+// Preference models
+export {
+  PlanningHeuristicsSchema,
+  UserPreferencesSchema,
+  PreferenceKeyEnum,
+  DEFAULT_PREFERENCES,
+  PreferenceRowSchema,
+  SetPreferenceSchema,
+  PreferenceValueSchemas,
+  getDefaultPreference,
+  validatePreferenceValue,
+  parsePreferenceValue,
+  type PlanningHeuristics,
+  type UserPreferences,
+  type PreferenceKey,
+  type PreferenceRow,
+  type SetPreference,
+} from './preference.js';

@@ -4,68 +4,12 @@
  * Tests all CRUD operations against an in-memory SQLite database.
  */
 
+import { test, expect, describe } from 'vitest';
+
 import { getDb, closeDb } from '../src/db/connection.js';
 import { migrate, getDefaultMigrationsDir } from '../src/db/migrate.js';
 import { RecipeRepository } from '../src/repos/recipe.repo.js';
 import type { Database } from 'better-sqlite3';
-
-// Test utilities
-interface TestResult {
-  name: string;
-  passed: boolean;
-  error?: Error;
-}
-
-const tests: Array<{ name: string; fn: () => void | Promise<void> }> = [];
-
-function test(name: string, fn: () => void | Promise<void>): void {
-  tests.push({ name, fn });
-}
-
-async function runTests(): Promise<void> {
-  const results: TestResult[] = [];
-
-  for (const { name, fn } of tests) {
-    try {
-      await fn();
-      results.push({ name, passed: true });
-      console.log(`  PASS: ${name}`);
-    } catch (error) {
-      results.push({ name, passed: false, error: error as Error });
-      console.log(`  FAIL: ${name}`);
-      console.log(`        ${(error as Error).message}`);
-    }
-  }
-
-  const passed = results.filter((r) => r.passed).length;
-  const failed = results.filter((r) => !r.passed).length;
-
-  console.log('');
-  console.log(`Results: ${passed} passed, ${failed} failed`);
-
-  if (failed > 0) {
-    process.exit(1);
-  }
-}
-
-// Assertions
-function assert(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(`Assertion failed: ${message}`);
-  }
-}
-
-function assertEqual<T>(actual: T, expected: T, message: string): void {
-  if (actual !== expected) {
-    throw new Error(`${message}: expected ${expected}, got ${actual}`);
-  }
-}
-
-function assertNotNull<T>(value: T | null | undefined, message: string): asserts value is T {
-  if (value === null || value === undefined) {
-    throw new Error(`${message}: expected non-null value`);
-  }
-}
 
 // Database setup helper
 function setupTestDb(): { db: Database; repo: RecipeRepository; cleanup: () => void } {
@@ -118,13 +62,13 @@ test('can create a simple recipe', () => {
       difficulty: null,
     });
 
-    assertNotNull(recipe, 'recipe should be created');
-    assertEqual(recipe.title, 'Test Recipe', 'title should match');
-    assertEqual(recipe.instructions, 'Mix ingredients and cook.', 'instructions should match');
-    assertEqual(recipe.servings, 4, 'servings should match');
-    assert(recipe.id.length > 0, 'id should be generated');
-    assert(recipe.createdAt.length > 0, 'createdAt should be set');
-    assert(recipe.updatedAt.length > 0, 'updatedAt should be set');
+    expect(recipe).toBeDefined();
+    expect(recipe.title).toBe('Test Recipe');
+    expect(recipe.instructions).toBe('Mix ingredients and cook.');
+    expect(recipe.servings).toBe(4);
+    expect(recipe.id.length > 0).toBe(true);
+    expect(recipe.createdAt.length > 0).toBe(true);
+    expect(recipe.updatedAt.length > 0).toBe(true);
   } finally {
     cleanup();
   }
@@ -146,15 +90,15 @@ test('can create recipe with all fields', () => {
       difficulty: 'medium',
     });
 
-    assertEqual(recipe.title, 'Full Recipe', 'title');
-    assertEqual(recipe.description, 'A complete recipe with all fields', 'description');
-    assertEqual(recipe.servings, 6, 'servings');
-    assertEqual(recipe.prepTimeMinutes, 15, 'prepTimeMinutes');
-    assertEqual(recipe.cookTimeMinutes, 30, 'cookTimeMinutes');
-    assertEqual(recipe.sourceUrl, 'https://example.com/recipe', 'sourceUrl');
-    assertEqual(recipe.sourceType, 'imported', 'sourceType');
-    assertEqual(recipe.cuisine, 'Italian', 'cuisine');
-    assertEqual(recipe.difficulty, 'medium', 'difficulty');
+    expect(recipe.title).toBe('Full Recipe');
+    expect(recipe.description).toBe('A complete recipe with all fields');
+    expect(recipe.servings).toBe(6);
+    expect(recipe.prepTimeMinutes).toBe(15);
+    expect(recipe.cookTimeMinutes).toBe(30);
+    expect(recipe.sourceUrl).toBe('https://example.com/recipe');
+    expect(recipe.sourceType).toBe('imported');
+    expect(recipe.cuisine).toBe('Italian');
+    expect(recipe.difficulty).toBe('medium');
   } finally {
     cleanup();
   }
@@ -185,18 +129,18 @@ test('can create recipe with ingredients', () => {
       ]
     );
 
-    assertNotNull(recipe.ingredients, 'ingredients should be set');
-    assertEqual(recipe.ingredients.length, 2, 'should have 2 ingredients');
+    expect(recipe.ingredients).toBeDefined();
+    expect(recipe.ingredients.length).toBe(2);
 
     const flour = recipe.ingredients.find((i) => i.ingredientId === ingredientId1);
-    assertNotNull(flour, 'should have flour ingredient');
-    assertEqual(flour.quantity, 2, 'flour quantity');
-    assertEqual(flour.unit, 'cups', 'flour unit');
-    assertEqual(flour.optional, false, 'flour optional');
+    expect(flour).toBeDefined();
+    expect(flour.quantity).toBe(2);
+    expect(flour.unit).toBe('cups');
+    expect(flour.optional).toBe(false);
 
     const sugar = recipe.ingredients.find((i) => i.ingredientId === ingredientId2);
-    assertNotNull(sugar, 'should have sugar ingredient');
-    assertEqual(sugar.optional, true, 'sugar optional');
+    expect(sugar).toBeDefined();
+    expect(sugar.optional).toBe(true);
   } finally {
     cleanup();
   }
@@ -225,10 +169,10 @@ test('can create recipe with tags', () => {
       [tagId1, tagId2]
     );
 
-    assertNotNull(recipe.tagIds, 'tagIds should be set');
-    assertEqual(recipe.tagIds.length, 2, 'should have 2 tags');
-    assert(recipe.tagIds.includes(tagId1), 'should include dinner tag');
-    assert(recipe.tagIds.includes(tagId2), 'should include vegetarian tag');
+    expect(recipe.tagIds).toBeDefined();
+    expect(recipe.tagIds.length).toBe(2);
+    expect(recipe.tagIds.includes(tagId1)).toBe(true);
+    expect(recipe.tagIds.includes(tagId2)).toBe(true);
   } finally {
     cleanup();
   }
@@ -252,9 +196,9 @@ test('can get recipe by ID', () => {
 
     const fetched = repo.getById(created.id);
 
-    assertNotNull(fetched, 'should find recipe');
-    assertEqual(fetched.id, created.id, 'id should match');
-    assertEqual(fetched.title, 'Get Test Recipe', 'title should match');
+    expect(fetched).toBeDefined();
+    expect(fetched.id).toBe(created.id);
+    expect(fetched.title).toBe('Get Test Recipe');
   } finally {
     cleanup();
   }
@@ -264,7 +208,7 @@ test('getById returns null for non-existent recipe', () => {
   const { repo, cleanup } = setupTestDb();
   try {
     const result = repo.getById('non-existent-id');
-    assertEqual(result, null, 'should return null for non-existent recipe');
+    expect(result).toBe(null);
   } finally {
     cleanup();
   }
@@ -312,7 +256,7 @@ test('can list all recipes', () => {
 
     const recipes = repo.list();
 
-    assertEqual(recipes.length, 3, 'should have 3 recipes');
+    expect(recipes.length).toBe(3);
   } finally {
     cleanup();
   }
@@ -338,13 +282,13 @@ test('can list recipes with limit and offset', () => {
     }
 
     const page1 = repo.list({ limit: 2 });
-    assertEqual(page1.length, 2, 'first page should have 2 recipes');
+    expect(page1.length).toBe(2);
 
     const page2 = repo.list({ limit: 2, offset: 2 });
-    assertEqual(page2.length, 2, 'second page should have 2 recipes');
+    expect(page2.length).toBe(2);
 
     const page3 = repo.list({ limit: 2, offset: 4 });
-    assertEqual(page3.length, 1, 'third page should have 1 recipe');
+    expect(page3.length).toBe(1);
   } finally {
     cleanup();
   }
@@ -379,11 +323,11 @@ test('can list recipes filtered by cuisine', () => {
     });
 
     const italian = repo.list({ cuisine: 'Italian' });
-    assertEqual(italian.length, 1, 'should have 1 Italian recipe');
-    assertEqual(italian[0].title, 'Italian Pasta', 'should be Italian Pasta');
+    expect(italian.length).toBe(1);
+    expect(italian[0].title).toBe('Italian Pasta');
 
     const mexican = repo.list({ cuisine: 'Mexican' });
-    assertEqual(mexican.length, 1, 'should have 1 Mexican recipe');
+    expect(mexican.length).toBe(1);
   } finally {
     cleanup();
   }
@@ -418,8 +362,8 @@ test('can list recipes filtered by difficulty', () => {
     });
 
     const easy = repo.list({ difficulty: 'easy' });
-    assertEqual(easy.length, 1, 'should have 1 easy recipe');
-    assertEqual(easy[0].title, 'Easy Recipe', 'should be Easy Recipe');
+    expect(easy.length).toBe(1);
+    expect(easy[0].title).toBe('Easy Recipe');
   } finally {
     cleanup();
   }
@@ -482,11 +426,11 @@ test('can list recipes filtered by tags', () => {
     );
 
     const dinners = repo.list({ tagIds: [dinnerTag] });
-    assertEqual(dinners.length, 2, 'should have 2 dinner recipes');
+    expect(dinners.length).toBe(2);
 
     const veganDinners = repo.list({ tagIds: [dinnerTag, veganTag] });
-    assertEqual(veganDinners.length, 1, 'should have 1 vegan dinner');
-    assertEqual(veganDinners[0].title, 'Vegan Dinner', 'should be Vegan Dinner');
+    expect(veganDinners.length).toBe(1);
+    expect(veganDinners[0].title).toBe('Vegan Dinner');
   } finally {
     cleanup();
   }
@@ -519,12 +463,12 @@ test('can update recipe fields', () => {
       cuisine: 'Thai',
     });
 
-    assertNotNull(updated, 'should return updated recipe');
-    assertEqual(updated.title, 'Updated Title', 'title should be updated');
-    assertEqual(updated.servings, 6, 'servings should be updated');
-    assertEqual(updated.cuisine, 'Thai', 'cuisine should be updated');
-    assertEqual(updated.instructions, 'Original instructions', 'instructions should be preserved');
-    assert(updated.updatedAt !== oldTimestamp, 'updatedAt should change');
+    expect(updated).toBeDefined();
+    expect(updated.title).toBe('Updated Title');
+    expect(updated.servings).toBe(6);
+    expect(updated.cuisine).toBe('Thai');
+    expect(updated.instructions).toBe('Original instructions');
+    expect(updated.updatedAt !== oldTimestamp).toBe(true);
   } finally {
     cleanup();
   }
@@ -556,7 +500,7 @@ test('can update recipe ingredients', () => {
       ]
     );
 
-    assertEqual(created.ingredients?.length, 2, 'should start with 2 ingredients');
+    expect(created.ingredients?.length).toBe(2);
 
     // Update to new ingredients
     const updated = repo.update(
@@ -564,9 +508,9 @@ test('can update recipe ingredients', () => {
       [{ ingredientId: ing3, quantity: 3, unit: 'oz', notes: 'new ingredient', optional: true }]
     );
 
-    assertNotNull(updated, 'should return updated recipe');
-    assertEqual(updated.ingredients?.length, 1, 'should have 1 ingredient');
-    assertEqual(updated.ingredients![0].ingredientId, ing3, 'should have new ingredient');
+    expect(updated).toBeDefined();
+    expect(updated.ingredients?.length).toBe(1);
+    expect(updated.ingredients![0].ingredientId).toBe(ing3);
   } finally {
     cleanup();
   }
@@ -596,14 +540,14 @@ test('can update recipe tags', () => {
       [tag1, tag2]
     );
 
-    assertEqual(created.tagIds?.length, 2, 'should start with 2 tags');
+    expect(created.tagIds?.length).toBe(2);
 
     // Update to new tags
     const updated = repo.update({ id: created.id }, undefined, [tag3]);
 
-    assertNotNull(updated, 'should return updated recipe');
-    assertEqual(updated.tagIds?.length, 1, 'should have 1 tag');
-    assertEqual(updated.tagIds![0], tag3, 'should have new tag');
+    expect(updated).toBeDefined();
+    expect(updated.tagIds?.length).toBe(1);
+    expect(updated.tagIds![0]).toBe(tag3);
   } finally {
     cleanup();
   }
@@ -613,7 +557,7 @@ test('update returns null for non-existent recipe', () => {
   const { repo, cleanup } = setupTestDb();
   try {
     const result = repo.update({ id: 'non-existent-id', title: 'New Title' });
-    assertEqual(result, null, 'should return null for non-existent recipe');
+    expect(result).toBe(null);
   } finally {
     cleanup();
   }
@@ -636,10 +580,10 @@ test('can delete recipe', () => {
     });
 
     const deleted = repo.delete(created.id);
-    assertEqual(deleted, true, 'delete should return true');
+    expect(deleted).toBe(true);
 
     const fetched = repo.getById(created.id);
-    assertEqual(fetched, null, 'deleted recipe should not be found');
+    expect(fetched).toBe(null);
   } finally {
     cleanup();
   }
@@ -649,7 +593,7 @@ test('delete returns false for non-existent recipe', () => {
   const { repo, cleanup } = setupTestDb();
   try {
     const result = repo.delete('non-existent-id');
-    assertEqual(result, false, 'delete should return false for non-existent recipe');
+    expect(result).toBe(false);
   } finally {
     cleanup();
   }
@@ -680,7 +624,7 @@ test('delete cascades to recipe_ingredients', () => {
     const beforeDelete = db
       .prepare('SELECT COUNT(*) as count FROM recipe_ingredients WHERE recipe_id = ?')
       .get(created.id) as { count: number };
-    assertEqual(beforeDelete.count, 1, 'should have 1 recipe ingredient before delete');
+    expect(beforeDelete.count).toBe(1);
 
     repo.delete(created.id);
 
@@ -688,7 +632,7 @@ test('delete cascades to recipe_ingredients', () => {
     const afterDelete = db
       .prepare('SELECT COUNT(*) as count FROM recipe_ingredients WHERE recipe_id = ?')
       .get(created.id) as { count: number };
-    assertEqual(afterDelete.count, 0, 'recipe ingredients should be deleted');
+    expect(afterDelete.count).toBe(0);
   } finally {
     cleanup();
   }
@@ -720,7 +664,7 @@ test('delete cascades to recipe_tags', () => {
     const beforeDelete = db
       .prepare('SELECT COUNT(*) as count FROM recipe_tags WHERE recipe_id = ?')
       .get(created.id) as { count: number };
-    assertEqual(beforeDelete.count, 1, 'should have 1 recipe tag before delete');
+    expect(beforeDelete.count).toBe(1);
 
     repo.delete(created.id);
 
@@ -728,7 +672,7 @@ test('delete cascades to recipe_tags', () => {
     const afterDelete = db
       .prepare('SELECT COUNT(*) as count FROM recipe_tags WHERE recipe_id = ?')
       .get(created.id) as { count: number };
-    assertEqual(afterDelete.count, 0, 'recipe tags should be deleted');
+    expect(afterDelete.count).toBe(0);
   } finally {
     cleanup();
   }
@@ -750,7 +694,7 @@ test('exists returns true for existing recipe', () => {
       difficulty: null,
     });
 
-    assertEqual(repo.exists(created.id), true, 'should return true for existing recipe');
+    expect(repo.exists(created.id)).toBe(true);
   } finally {
     cleanup();
   }
@@ -759,7 +703,7 @@ test('exists returns true for existing recipe', () => {
 test('exists returns false for non-existent recipe', () => {
   const { repo, cleanup } = setupTestDb();
   try {
-    assertEqual(repo.exists('non-existent-id'), false, 'should return false for non-existent recipe');
+    expect(repo.exists('non-existent-id')).toBe(false);
   } finally {
     cleanup();
   }
@@ -768,7 +712,7 @@ test('exists returns false for non-existent recipe', () => {
 test('count returns correct number', () => {
   const { repo, cleanup } = setupTestDb();
   try {
-    assertEqual(repo.count(), 0, 'should start with 0 recipes');
+    expect(repo.count()).toBe(0);
 
     repo.create({
       title: 'Recipe 1',
@@ -795,7 +739,7 @@ test('count returns correct number', () => {
       difficulty: null,
     });
 
-    assertEqual(repo.count(), 2, 'should have 2 recipes');
+    expect(repo.count()).toBe(2);
   } finally {
     cleanup();
   }
@@ -847,16 +791,447 @@ test('count with filters', () => {
       difficulty: null,
     });
 
-    assertEqual(repo.count(), 3, 'total count');
-    assertEqual(repo.count({ cuisine: 'Italian' }), 2, 'Italian count');
-    assertEqual(repo.count({ tagIds: [tag] }), 1, 'Vegan count');
-    assertEqual(repo.count({ cuisine: 'Italian', tagIds: [tag] }), 1, 'Vegan Italian count');
+    expect(repo.count()).toBe(3);
+    expect(repo.count({ cuisine: 'Italian' })).toBe(2);
+    expect(repo.count({ tagIds: [tag] })).toBe(1);
+    expect(repo.count({ cuisine: 'Italian', tagIds: [tag] })).toBe(1);
   } finally {
     cleanup();
   }
 });
 
-// Run all tests
-console.log('Running RecipeRepository integration tests...');
-console.log('');
-runTests();
+// ==================== FTS5 Search Tests ====================
+
+test('FTS search finds recipes by title', () => {
+  const { repo, cleanup } = setupTestDb();
+  try {
+    repo.create({
+      title: 'Chicken Parmesan',
+      instructions: 'Cook the chicken',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+    repo.create({
+      title: 'Beef Stew',
+      instructions: 'Cook the beef slowly',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+    repo.create({
+      title: 'Grilled Chicken Salad',
+      instructions: 'Grill the chicken and add to salad',
+      servings: 2,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+
+    const results = repo.list({ search: 'chicken' });
+    expect(results.length).toBe(2);
+
+    // Verify both chicken recipes are in results
+    const titles = results.map(r => r.title);
+    expect(titles.includes('Chicken Parmesan')).toBe(true);
+    expect(titles.includes('Grilled Chicken Salad')).toBe(true);
+  } finally {
+    cleanup();
+  }
+});
+
+test('FTS search finds recipes by description', () => {
+  const { repo, cleanup } = setupTestDb();
+  try {
+    repo.create({
+      title: 'Simple Pasta',
+      instructions: 'Boil pasta',
+      servings: 4,
+      description: 'A quick and delicious weeknight dinner',
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+    repo.create({
+      title: 'Complex Risotto',
+      instructions: 'Stir constantly',
+      servings: 4,
+      description: 'Perfect for special occasions',
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+
+    const results = repo.list({ search: 'weeknight' });
+    expect(results.length).toBe(1);
+    expect(results[0].title).toBe('Simple Pasta');
+  } finally {
+    cleanup();
+  }
+});
+
+test('FTS search finds recipes by instructions', () => {
+  const { repo, cleanup } = setupTestDb();
+  try {
+    repo.create({
+      title: 'Slow Cooker Recipe',
+      instructions: 'Place ingredients in slow cooker and simmer for 8 hours',
+      servings: 6,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+    repo.create({
+      title: 'Quick Stir Fry',
+      instructions: 'Heat wok and cook on high heat for 5 minutes',
+      servings: 2,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+
+    const results = repo.list({ search: 'simmer' });
+    expect(results.length).toBe(1);
+    expect(results[0].title).toBe('Slow Cooker Recipe');
+  } finally {
+    cleanup();
+  }
+});
+
+test('FTS search returns ranked results by relevance', () => {
+  const { repo, cleanup } = setupTestDb();
+  try {
+    // Recipe with chicken in title only
+    repo.create({
+      title: 'Beef Stew',
+      instructions: 'Cook beef with chicken stock',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+    // Recipe with chicken appearing multiple times
+    repo.create({
+      title: 'Chicken Chicken Chicken',
+      instructions: 'Chicken recipe with lots of chicken flavor',
+      servings: 4,
+      description: 'The ultimate chicken dish',
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+
+    const results = repo.list({ search: 'chicken' });
+    expect(results.length).toBe(2);
+    // The recipe with more occurrences of "chicken" should rank higher
+    expect(results[0].title).toBe('Chicken Chicken Chicken');
+  } finally {
+    cleanup();
+  }
+});
+
+test('FTS search works with cuisine filter', () => {
+  const { repo, cleanup } = setupTestDb();
+  try {
+    repo.create({
+      title: 'Italian Chicken Pasta',
+      instructions: 'Cook pasta with chicken',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: 'Italian',
+      difficulty: null,
+    });
+    repo.create({
+      title: 'Mexican Chicken Tacos',
+      instructions: 'Make tacos with chicken',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: 'Mexican',
+      difficulty: null,
+    });
+
+    const results = repo.list({ search: 'chicken', cuisine: 'Italian' });
+    expect(results.length).toBe(1);
+    expect(results[0].title).toBe('Italian Chicken Pasta');
+  } finally {
+    cleanup();
+  }
+});
+
+test('FTS search works with difficulty filter', () => {
+  const { repo, cleanup } = setupTestDb();
+  try {
+    repo.create({
+      title: 'Easy Chicken',
+      instructions: 'Simple chicken recipe',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: 'easy',
+    });
+    repo.create({
+      title: 'Hard Chicken',
+      instructions: 'Complex chicken recipe',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: 'hard',
+    });
+
+    const results = repo.list({ search: 'chicken', difficulty: 'easy' });
+    expect(results.length).toBe(1);
+    expect(results[0].title).toBe('Easy Chicken');
+  } finally {
+    cleanup();
+  }
+});
+
+test('FTS search works with tag filter', () => {
+  const { db, repo, cleanup } = setupTestDb();
+  try {
+    const veganTag = createTestTag(db, 'Vegan', 'dietary');
+
+    repo.create(
+      {
+        title: 'Vegan Pasta',
+        instructions: 'Cook vegan pasta',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      },
+      undefined,
+      [veganTag]
+    );
+    repo.create({
+      title: 'Regular Pasta',
+      instructions: 'Cook pasta with meat',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+
+    const results = repo.list({ search: 'pasta', tagIds: [veganTag] });
+    expect(results.length).toBe(1);
+    expect(results[0].title).toBe('Vegan Pasta');
+  } finally {
+    cleanup();
+  }
+});
+
+test('FTS search returns empty for no matches', () => {
+  const { repo, cleanup } = setupTestDb();
+  try {
+    repo.create({
+      title: 'Chicken Recipe',
+      instructions: 'Cook chicken',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+
+    const results = repo.list({ search: 'xyz123nonexistent' });
+    expect(results.length).toBe(0);
+  } finally {
+    cleanup();
+  }
+});
+
+test('FTS count works with search', () => {
+  const { repo, cleanup } = setupTestDb();
+  try {
+    repo.create({
+      title: 'Chicken One',
+      instructions: 'Recipe one',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+    repo.create({
+      title: 'Chicken Two',
+      instructions: 'Recipe two',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+    repo.create({
+      title: 'Beef Recipe',
+      instructions: 'Recipe three',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: null,
+      difficulty: null,
+    });
+
+    expect(repo.count({ search: 'chicken' })).toBe(2);
+    expect(repo.count({ search: 'beef' })).toBe(1);
+    expect(repo.count({ search: 'nonexistent' })).toBe(0);
+  } finally {
+    cleanup();
+  }
+});
+
+test('FTS count works with search and other filters', () => {
+  const { db, repo, cleanup } = setupTestDb();
+  try {
+    const veganTag = createTestTag(db, 'Vegan', 'dietary');
+
+    repo.create({
+      title: 'Italian Chicken',
+      instructions: 'Italian style',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: 'Italian',
+      difficulty: null,
+    });
+    repo.create(
+      {
+        title: 'Vegan Italian Pasta',
+        instructions: 'Contains word chicken stock alternative',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: 'Italian',
+        difficulty: null,
+      },
+      undefined,
+      [veganTag]
+    );
+    repo.create({
+      title: 'Mexican Chicken',
+      instructions: 'Mexican style',
+      servings: 4,
+      description: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      sourceUrl: null,
+      sourceType: null,
+      cuisine: 'Mexican',
+      difficulty: null,
+    });
+
+    expect(repo.count({ search: 'chicken', cuisine: 'Italian' })).toBe(2);
+    expect(repo.count({ search: 'chicken', tagIds: [veganTag] })).toBe(1);
+  } finally {
+    cleanup();
+  }
+});
+
+test('FTS search with limit and offset', () => {
+  const { repo, cleanup } = setupTestDb();
+  try {
+    // Create 5 chicken recipes
+    for (let i = 1; i <= 5; i++) {
+      repo.create({
+        title: `Chicken Recipe ${i}`,
+        instructions: `Instructions ${i}`,
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+    }
+
+    const page1 = repo.list({ search: 'chicken', limit: 2 });
+    expect(page1.length).toBe(2);
+
+    const page2 = repo.list({ search: 'chicken', limit: 2, offset: 2 });
+    expect(page2.length).toBe(2);
+
+    const page3 = repo.list({ search: 'chicken', limit: 2, offset: 4 });
+    expect(page3.length).toBe(1);
+  } finally {
+    cleanup();
+  }
+});
+
