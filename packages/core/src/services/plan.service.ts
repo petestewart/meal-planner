@@ -20,6 +20,7 @@ import type {
   PlanItem,
   PlanStatus,
   MealType,
+  SlotType,
 } from '../models/index.js';
 
 /**
@@ -193,16 +194,26 @@ export class PlanService {
     recipeId: string | null,
     servings?: number,
     notes?: string,
-    actor: string = DEFAULT_ACTOR
+    actor: string = DEFAULT_ACTOR,
+    slotType: SlotType = 'recipe',
+    leftoversSourceId: string | null = null
   ): PlanItem | null {
     // Verify plan exists
     if (!this.planRepo.exists(planId)) {
       return null;
     }
 
-    // Verify recipe exists if provided
-    if (recipeId && !this.recipeRepo.exists(recipeId)) {
+    // Verify recipe exists if provided (only for recipe slot types)
+    if (recipeId && slotType === 'recipe' && !this.recipeRepo.exists(recipeId)) {
       throw new Error(`Recipe ${recipeId} not found`);
+    }
+
+    // Verify leftovers source exists if provided
+    if (leftoversSourceId) {
+      const sourceItem = this.planRepo.getMealById(leftoversSourceId);
+      if (!sourceItem) {
+        throw new Error(`Leftovers source meal ${leftoversSourceId} not found`);
+      }
     }
 
     const item = this.planRepo.setMeal(
@@ -211,7 +222,9 @@ export class PlanService {
       mealType,
       recipeId,
       servings,
-      notes ?? null
+      notes ?? null,
+      slotType,
+      leftoversSourceId
     );
 
     this.auditRepo.log({
@@ -225,6 +238,8 @@ export class PlanService {
         mealType,
         recipeId,
         servings: item.servings,
+        slotType,
+        leftoversSourceId,
       },
     });
 

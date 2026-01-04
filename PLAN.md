@@ -2492,8 +2492,8 @@ pnpm --filter @meals/core test
 
 ### Ticket: T040 Support dining out, skip, and leftovers meal slots
 - **Priority:** P2
-- **Status:** Pending
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T040
 - **Scope:** Allow marking meal slots as "dining out", "skip", or "leftovers" without requiring a new recipe
 - **Acceptance Criteria:**
   - Add `slot_type` field to `plan_items` table: 'recipe' (default), 'dining_out', 'skip', 'leftovers'
@@ -2510,14 +2510,29 @@ pnpm --filter @meals/core test
   - `meals plan show` displays appropriate labels for each slot type
   - Grocery list excludes non-recipe slots
 - **Notes:**
-  - Migration needed:
+  - Implementation complete (Agent-T040):
+    - Created migration 003_slot_types.sql with slot_type and leftovers_source_id columns
+    - Updated PlanItem model with SlotTypeEnum and new fields
+    - Updated plan repository setMeal method to support slot_type and leftovers_source_id
+    - Updated plan service setMeal to validate leftovers source exists
+    - Updated grocery service to exclude non-recipe slot types from grocery list generation
+    - Updated CLI plan set command with --dining-out, --skip, and --leftovers-from flags
+    - Updated plan show display to show "Dining Out", "Skip", and "Leftovers (from Day meal)" labels
+  - Orchestrator notes:
+    - Intended approach: Add migration for slot_type and leftovers_source_id columns, update PlanItem model, update plan CLI set command with --dining-out, --skip, --leftovers-from flags, update plan show to display slot types, update grocery service to exclude non-recipe slots
+    - Key constraints: Migration must add columns safely. slot_type defaults to 'recipe'. Leftovers must reference a valid plan_item. Grocery list should only include 'recipe' slot types.
+    - Dependencies: T012 (plan service - done), T014 (grocery service - done)
+    - Estimated complexity: moderate-high
+  - Original notes:
+    - Migration needed (see schema below)
+    - Update PlanItem model and schema
+    - Leftovers tracking helps with meal prep planning
+  - Schema:
     ```sql
     ALTER TABLE plan_items ADD COLUMN slot_type TEXT DEFAULT 'recipe'
       CHECK(slot_type IN ('recipe', 'dining_out', 'skip', 'leftovers'));
     ALTER TABLE plan_items ADD COLUMN leftovers_source_id TEXT REFERENCES plan_items(id);
     ```
-  - Update PlanItem model and schema
-  - Leftovers tracking helps with meal prep planning
 
 ### Ticket: T041 Support batch cooking and meal prep tracking
 - **Priority:** P2

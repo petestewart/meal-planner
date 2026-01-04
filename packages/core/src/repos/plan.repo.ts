@@ -14,6 +14,7 @@ import type {
   PlanItem,
   PlanStatus,
   MealType,
+  SlotType,
   WeeklyPlanWithItems,
 } from '../models/index.js';
 
@@ -46,6 +47,8 @@ interface PlanItemRow {
   meal_type: string;
   servings: number;
   notes: string | null;
+  slot_type: string | null;
+  leftovers_source_id: string | null;
 }
 
 /**
@@ -74,6 +77,8 @@ function rowToPlanItem(row: PlanItemRow): PlanItem {
     mealType: row.meal_type as MealType,
     servings: row.servings,
     notes: row.notes,
+    slotType: (row.slot_type ?? 'recipe') as SlotType,
+    leftoversSourceId: row.leftovers_source_id,
   };
 }
 
@@ -289,7 +294,9 @@ export class PlanRepository {
     mealType: MealType,
     recipeId: string | null,
     servings: number = 2,
-    notes: string | null = null
+    notes: string | null = null,
+    slotType: SlotType = 'recipe',
+    leftoversSourceId: string | null = null
   ): PlanItem {
     // Check if a meal already exists at this slot
     const existing = this.db
@@ -303,11 +310,11 @@ export class PlanRepository {
     this.db
       .prepare(
         `
-        INSERT OR REPLACE INTO plan_items (id, plan_id, recipe_id, day_of_week, meal_type, servings, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO plan_items (id, plan_id, recipe_id, day_of_week, meal_type, servings, notes, slot_type, leftovers_source_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
       )
-      .run(id, planId, recipeId, dayOfWeek, mealType, servings, notes);
+      .run(id, planId, recipeId, dayOfWeek, mealType, servings, notes, slotType, leftoversSourceId);
 
     return this.getMealBySlot(planId, dayOfWeek, mealType)!;
   }

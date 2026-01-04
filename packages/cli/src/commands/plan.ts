@@ -8,8 +8,10 @@ import {
   RecipeService,
   SuggestionService,
   type MealType,
+  type SlotType,
   type WeeklyPlanWithItems,
   type RecipeSuggestion,
+  type PlanItem,
 } from '@meals/core';
 import {
   printJson,
@@ -148,6 +150,41 @@ function parseMealType(input: string): MealType {
 }
 
 /**
+ * Format slot display text based on slot type
+ */
+function getSlotDisplayText(
+  item: PlanItem,
+  recipeService: RecipeService,
+  planItems: PlanItem[]
+): string {
+  const slotType = item.slotType ?? 'recipe';
+
+  switch (slotType) {
+    case 'dining_out':
+      return item.notes ? `Dining Out (${item.notes})` : 'Dining Out';
+    case 'skip':
+      return 'Skip';
+    case 'leftovers': {
+      if (item.leftoversSourceId) {
+        const sourceItem = planItems.find(i => i.id === item.leftoversSourceId);
+        if (sourceItem) {
+          const dayName = getDayName(sourceItem.dayOfWeek);
+          return `Leftovers (from ${dayName} ${sourceItem.mealType})`;
+        }
+      }
+      return 'Leftovers';
+    }
+    case 'recipe':
+    default:
+      if (item.recipeId) {
+        const recipe = recipeService.getRecipe(item.recipeId);
+        return recipe?.title ?? item.recipeId;
+      }
+      return '-';
+  }
+}
+
+/**
  * Format plan as a table for display
  */
 function displayPlanTable(plan: WeeklyPlanWithItems, recipeService: RecipeService): void {
@@ -155,16 +192,15 @@ function displayPlanTable(plan: WeeklyPlanWithItems, recipeService: RecipeServic
   console.log(`Week ${plan.week} (${plan.status})`);
   console.log('');
 
+  const planItems = plan.items || [];
+
   // Build a lookup for items by day and meal type
   const itemsBySlot = new Map<string, string>();
-  if (plan.items) {
-    for (const item of plan.items) {
-      const key = `${item.dayOfWeek}-${item.mealType}`;
-      if (item.recipeId) {
-        // Look up recipe title
-        const recipe = recipeService.getRecipe(item.recipeId);
-        itemsBySlot.set(key, recipe?.title ?? item.recipeId);
-      }
+  for (const item of planItems) {
+    const key = `${item.dayOfWeek}-${item.mealType}`;
+    const displayText = getSlotDisplayText(item, recipeService, planItems);
+    if (displayText !== '-') {
+      itemsBySlot.set(key, displayText);
     }
   }
 
@@ -173,7 +209,7 @@ function displayPlanTable(plan: WeeklyPlanWithItems, recipeService: RecipeServic
   const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner'];
   const mealWidths: Record<MealType, number> = { breakfast: 9, lunch: 5, dinner: 6 };
 
-  // Find max widths based on recipe titles
+  // Find max widths based on display text
   for (let day = 1; day <= 7; day++) {
     for (const meal of mealTypes) {
       const key = `${day}-${meal}`;
@@ -592,11 +628,14 @@ planCommand
 
 // SET command
 planCommand
-  .command('set <week> <day> <meal> <recipe-id>')
+  .command('set <week> <day> <meal> [recipe-id]')
   .description('Set a specific meal (day: mon-sun, meal: breakfast/lunch/dinner)')
   .option('-s, --servings <n>', 'Number of servings', '2')
   .option('-n, --notes <text>', 'Notes for this meal')
-  .action((week: string, day: string, meal: string, recipeId: string, options, command) => {
+  .option('--dining-out', 'Mark this slot as dining out (no recipe needed)')
+  .option('--skip', 'Mark this slot as skipped')
+  .option('--leftovers-from <day-meal>', 'Mark as leftovers from another meal (e.g., "mon dinner")')
+  .action((week: string, day: string, meal: string, recipeId: string | undefined, options, command) => {
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
 
     try {
@@ -618,11 +657,56 @@ planCommand
         });
       }
 
-      // Verify recipe exists
-      const recipe = recipeService.getRecipe(recipeId);
-      if (!recipe) {
-        printError(`Recipe not found: ${recipeId}`);
-        process.exit(1);
+      // Determine slot type based on flags
+      let slotType: SlotType = 'recipe';
+      let leftoversSourceId: string | null = null;
+      let displayMessage = '';
+      const dayName = getDayName(dayOfWeek);
+
+      if (options.diningOut) {
+        slotType = 'dining_out';
+        displayMessage = options.notes
+          ? `Set ${dayName} ${mealType} to Dining Out (${options.notes}) for week ${isoWeek}`
+          : `Set ${dayName} ${mealType} to Dining Out for week ${isoWeek}`;
+      } else if (options.skip) {
+        slotType = 'skip';
+        displayMessage = `Set ${dayName} ${mealType} to Skip for week ${isoWeek}`;
+      } else if (options.leftoversFrom) {
+        slotType = 'leftovers';
+        // Parse the leftovers-from option (e.g., "mon dinner")
+        const parts = options.leftoversFrom.trim().split(/\s+/);
+        if (parts.length !== 2) {
+          printError('Invalid --leftovers-from format. Expected "<day> <meal>" (e.g., "mon dinner")');
+          process.exit(1);
+        }
+        const [sourceDay, sourceMeal] = parts;
+        const sourceDayOfWeek = parseDay(sourceDay);
+        const sourceMealType = parseMealType(sourceMeal);
+
+        // Find the source meal in the plan
+        const sourceMealItem = plan.items?.find(
+          item => item.dayOfWeek === sourceDayOfWeek && item.mealType === sourceMealType
+        );
+        if (!sourceMealItem) {
+          printError(`No meal found at ${getDayName(sourceDayOfWeek)} ${sourceMealType} to use as leftovers source`);
+          process.exit(1);
+        }
+        leftoversSourceId = sourceMealItem.id;
+        displayMessage = `Set ${dayName} ${mealType} to Leftovers (from ${getDayName(sourceDayOfWeek)} ${sourceMealType}) for week ${isoWeek}`;
+      } else {
+        // Regular recipe slot - recipe-id is required
+        if (!recipeId) {
+          printError('Recipe ID is required unless using --dining-out, --skip, or --leftovers-from');
+          process.exit(1);
+        }
+
+        // Verify recipe exists
+        const recipe = recipeService.getRecipe(recipeId);
+        if (!recipe) {
+          printError(`Recipe not found: ${recipeId}`);
+          process.exit(1);
+        }
+        displayMessage = `Set ${dayName} ${mealType} to "${recipe.title}" for week ${isoWeek}`;
       }
 
       // Set the meal
@@ -630,9 +714,12 @@ planCommand
         plan.id,
         dayOfWeek,
         mealType,
-        recipeId,
+        slotType === 'recipe' ? recipeId! : null,
         servings,
-        options.notes
+        options.notes,
+        'user',
+        slotType,
+        leftoversSourceId
       );
 
       if (!item) {
@@ -643,10 +730,7 @@ planCommand
       if (globalOpts.json) {
         printJson(item);
       } else {
-        const dayName = getDayName(dayOfWeek);
-        printSuccess(
-          `Set ${dayName} ${mealType} to "${recipe.title}" for week ${isoWeek}`
-        );
+        printSuccess(displayMessage);
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');

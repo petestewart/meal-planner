@@ -275,9 +275,12 @@ export class GroceryService {
     }
 
     // Collect all ingredients from plan items
+    // Only include items with slot_type 'recipe' (skip dining_out, skip, leftovers)
     const aggregations = new Map<string, IngredientAggregation>();
 
     for (const item of plan.items || []) {
+      // Only process recipe slots - skip dining_out, skip, and leftovers
+      if (item.slotType && item.slotType !== 'recipe') continue;
       if (!item.recipeId) continue;
 
       const recipe = this.recipeRepo.getById(item.recipeId);

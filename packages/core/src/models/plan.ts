@@ -38,6 +38,16 @@ export const MealTypeEnum = z.enum(['breakfast', 'lunch', 'dinner']);
 export type MealType = z.infer<typeof MealTypeEnum>;
 
 /**
+ * Valid slot type values for plan items.
+ * - 'recipe': A regular meal with a recipe
+ * - 'dining_out': Eating out (no recipe needed)
+ * - 'skip': Skipping this meal
+ * - 'leftovers': Eating leftovers from another meal
+ */
+export const SlotTypeEnum = z.enum(['recipe', 'dining_out', 'skip', 'leftovers']);
+export type SlotType = z.infer<typeof SlotTypeEnum>;
+
+/**
  * Day of week validation (1=Monday through 7=Sunday).
  */
 export const DayOfWeekSchema = z.number().int().min(1).max(7);
@@ -91,6 +101,8 @@ export const PlanItemSchema = z.object({
   mealType: MealTypeEnum,
   servings: z.number().int().positive().default(2),
   notes: z.string().nullable(),
+  slotType: SlotTypeEnum.default('recipe'),
+  leftoversSourceId: z.string().nullable().optional(),
 });
 
 export type PlanItem = z.infer<typeof PlanItemSchema>;
