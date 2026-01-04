@@ -2511,8 +2511,8 @@ pnpm --filter @meals/core test
 
 ### Ticket: T042 Headless browser fallback for recipe import
 - **Priority:** P1
-- **Status:** Pending
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T042
 - **Scope:** Use headless browser to import recipes from sites that block automated requests
 - **Acceptance Criteria:**
   - Add `puppeteer` or `playwright` as optional dependency to `@meals/core`
@@ -2526,9 +2526,25 @@ pnpm --filter @meals/core test
   - Import still works for non-blocking sites without launching browser
   - `--no-browser` flag causes 403 error on blocking sites (expected)
 - **Notes:**
-  - Puppeteer/Playwright adds ~150MB for browser binaries
-  - Consider lazy-loading the browser dependency
-  - May need to handle cookie consent dialogs on some sites
+  - Orchestrator notes:
+    - Intended approach: Add playwright as optional dependency. Modify ImportService.fetchHtml() to try native fetch first, then fall back to playwright if 403/blocking detected. Use dynamic import to lazy-load playwright. Update CLI recipe import command with --no-browser flag.
+    - Key constraints: Playwright is preferred over puppeteer (smaller, more reliable). Lazy-load to avoid startup penalty. Must handle Cloudflare and similar protection. Consider user-agent spoofing before browser fallback.
+    - Dependencies: T023 (import service - done)
+    - Estimated complexity: moderate-high
+  - Original notes:
+    - Puppeteer/Playwright adds ~150MB for browser binaries
+    - Consider lazy-loading the browser dependency
+    - May need to handle cookie consent dialogs on some sites
+  - Agent-T042 implementation notes (2026-01-04):
+    - Added playwright ^1.57.0 as optional dependency in packages/core/package.json
+    - Implemented fetchHtmlNative() for native fetch with browser-like User-Agent
+    - Implemented fetchHtmlWithBrowser() using playwright chromium for blocked sites
+    - Dynamic import used for playwright to avoid startup penalty (loads in ~164ms without playwright)
+    - Detection includes HTTP status codes (403, 503, 429) and content patterns (Cloudflare, etc.)
+    - Added --no-browser flag to CLI recipe import command
+    - Exported ImportOptions type from @meals/core
+    - All tests pass, build succeeds
+    - Tested: BBC Good Food works with native fetch, AllRecipes detected as blocking
 
 ### Ticket: T043 Recipe versioning and variations
 - **Priority:** P2

@@ -72,8 +72,50 @@ interface SchemaInstruction {
 // Maximum size of HTML to fetch (5MB)
 const MAX_FETCH_SIZE = 5 * 1024 * 1024;
 
-// Default User-Agent for fetching
-const USER_AGENT = 'Mozilla/5.0 (compatible; MealPlannerBot/1.0; +https://github.com/meal-planner)';
+// Browser-like User-Agent for fetching (helps avoid some basic bot blocking)
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+// HTTP status codes that indicate blocking/protection
+const BLOCKING_STATUS_CODES = [403, 503, 429];
+
+// Content patterns that indicate blocking (Cloudflare, etc.)
+const BLOCKING_PATTERNS = [
+  'cf-browser-verification',
+  'cloudflare',
+  'just a moment',
+  'checking your browser',
+  'please enable javascript',
+  'ray id:',
+];
+
+/**
+ * Options for the import service fetch behavior.
+ */
+export interface ImportOptions {
+  /** Disable headless browser fallback */
+  noBrowser?: boolean;
+}
+
+/**
+ * Check if playwright is available (optional dependency).
+ */
+async function getPlaywright(): Promise<typeof import('playwright') | null> {
+  try {
+    // Dynamic import to lazy-load playwright
+    const playwright = await import('playwright');
+    return playwright;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Detect if HTML content indicates bot blocking/protection.
+ */
+function isBlockingResponse(html: string): boolean {
+  const lowerHtml = html.toLowerCase();
+  return BLOCKING_PATTERNS.some(pattern => lowerHtml.includes(pattern));
+}
 
 /**
  * Parse ISO 8601 duration (e.g., PT15M, PT1H30M) to minutes.
@@ -293,9 +335,10 @@ export class ImportService {
   }
 
   /**
-   * Fetch HTML from a URL with proper error handling and size limits.
+   * Fetch HTML from a URL using native fetch.
+   * Returns { html, blocked } where blocked indicates if the response appears to be a blocking page.
    */
-  private async fetchHtml(url: string): Promise<string> {
+  private async fetchHtmlNative(url: string): Promise<{ html: string; blocked: boolean; statusCode: number }> {
     // Validate URL
     let parsedUrl: URL;
     try {
@@ -319,10 +362,20 @@ export class ImportService {
           'User-Agent': USER_AGENT,
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
         },
         signal: controller.signal,
         redirect: 'follow',
       });
+
+      const statusCode = response.status;
+
+      // Check if response indicates blocking
+      if (BLOCKING_STATUS_CODES.includes(statusCode)) {
+        return { html: '', blocked: true, statusCode };
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -363,10 +416,85 @@ export class ImportService {
       }
 
       const decoder = new TextDecoder('utf-8');
-      return chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join('');
+      const html = chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join('');
+
+      // Check if the response content indicates blocking (even with 200 status)
+      const blocked = isBlockingResponse(html);
+
+      return { html, blocked, statusCode };
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  /**
+   * Fetch HTML from a URL using a headless browser (playwright).
+   * This is used as a fallback when native fetch is blocked.
+   */
+  private async fetchHtmlWithBrowser(url: string): Promise<string> {
+    const playwright = await getPlaywright();
+    if (!playwright) {
+      throw new Error('Headless browser (playwright) is not available. Install it with: pnpm add playwright');
+    }
+
+    let browser = null;
+    try {
+      // Use chromium for best compatibility
+      browser = await playwright.chromium.launch({
+        headless: true,
+      });
+
+      const context = await browser.newContext({
+        userAgent: USER_AGENT,
+        viewport: { width: 1280, height: 720 },
+        locale: 'en-US',
+      });
+
+      const page = await context.newPage();
+
+      // Navigate to the URL and wait for the page to load
+      await page.goto(url, {
+        waitUntil: 'networkidle',
+        timeout: 60000,
+      });
+
+      // Wait a bit for any JavaScript rendering
+      await page.waitForTimeout(2000);
+
+      // Get the full page HTML after JavaScript execution
+      const html = await page.content();
+
+      return html;
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
+    }
+  }
+
+  /**
+   * Fetch HTML from a URL with proper error handling and size limits.
+   * Tries native fetch first, falls back to headless browser if blocked.
+   */
+  private async fetchHtml(url: string, options: ImportOptions = {}): Promise<string> {
+    // Try native fetch first
+    const nativeResult = await this.fetchHtmlNative(url);
+
+    // If not blocked, return the HTML
+    if (!nativeResult.blocked) {
+      return nativeResult.html;
+    }
+
+    // If blocked and browser fallback is disabled, throw an error
+    if (options.noBrowser) {
+      if (BLOCKING_STATUS_CODES.includes(nativeResult.statusCode)) {
+        throw new Error(`HTTP ${nativeResult.statusCode}: Site is blocking automated requests. Use headless browser fallback (remove --no-browser flag) to bypass.`);
+      }
+      throw new Error('Site is blocking automated requests (detected anti-bot protection). Use headless browser fallback (remove --no-browser flag) to bypass.');
+    }
+
+    // Fall back to headless browser
+    return this.fetchHtmlWithBrowser(url);
   }
 
   /**
@@ -434,10 +562,12 @@ export class ImportService {
 
   /**
    * Parse a URL and extract recipe data without saving.
+   * @param url The URL to import from
+   * @param options Import options (e.g., noBrowser to disable headless browser fallback)
    */
-  async parseRecipeFromUrl(url: string): Promise<ImportResult> {
+  async parseRecipeFromUrl(url: string, options: ImportOptions = {}): Promise<ImportResult> {
     try {
-      const html = await this.fetchHtml(url);
+      const html = await this.fetchHtml(url, options);
 
       // Try JSON-LD first
       const jsonLdRecipe = this.extractJsonLdRecipe(html);
@@ -481,16 +611,20 @@ export class ImportService {
 
   /**
    * Parse a URL and save the recipe to the database.
+   * @param url The URL to import from
+   * @param actor The actor performing the import
+   * @param options Import options (e.g., noBrowser to disable headless browser fallback)
    */
   async importRecipeFromUrl(
     url: string,
-    actor?: string
+    actor?: string,
+    options: ImportOptions = {}
   ): Promise<SaveImportResult> {
     if (!this.recipeService) {
       return { success: false, error: 'Database not available - cannot save recipe' };
     }
 
-    const parseResult = await this.parseRecipeFromUrl(url);
+    const parseResult = await this.parseRecipeFromUrl(url, options);
     if (!parseResult.success || !parseResult.recipe) {
       return { success: false, error: parseResult.error };
     }

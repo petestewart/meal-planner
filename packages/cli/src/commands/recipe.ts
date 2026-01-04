@@ -12,6 +12,7 @@ import {
   type RecipeWithRelations,
   type CreateRecipe,
   type CreateRecipeIngredientInput,
+  type ImportOptions,
 } from '@meals/core';
 import {
   printJson,
@@ -531,6 +532,7 @@ recipeCommand
 recipeCommand
   .command('import <url>')
   .description('Import recipe from URL (supports sites with schema.org JSON-LD)')
+  .option('--no-browser', 'Disable headless browser fallback for blocked sites')
   .action(async (url: string, options, command) => {
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
 
@@ -539,12 +541,20 @@ recipeCommand
       migrate(db, getDefaultMigrationsDir());
       const importService = new ImportService(db);
 
+      // Build import options from CLI flags
+      const importOptions: ImportOptions = {
+        noBrowser: options.browser === false, // commander inverts --no-browser to browser: false
+      };
+
       if (!globalOpts.json) {
         console.log(`Importing recipe from: ${url}`);
+        if (importOptions.noBrowser) {
+          console.log('(headless browser fallback disabled)');
+        }
         console.log('');
       }
 
-      const result = await importService.importRecipeFromUrl(url);
+      const result = await importService.importRecipeFromUrl(url, undefined, importOptions);
 
       if (!result.success || !result.recipe) {
         printError(result.error || 'Failed to import recipe');

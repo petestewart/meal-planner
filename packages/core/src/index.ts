@@ -145,6 +145,7 @@ export {
   type ImportedRecipeData,
   type ImportResult,
   type SaveImportResult,
+  type ImportOptions,
   SuggestionService,
   type SuggestionReason,
   type RecipeSuggestion,

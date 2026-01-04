@@ -17,6 +17,7 @@ export {
   type ImportedRecipeData,
   type ImportResult,
   type SaveImportResult,
+  type ImportOptions,
 } from './import.service.js';
 export {
   SuggestionService,
