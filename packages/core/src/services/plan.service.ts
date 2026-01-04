@@ -304,4 +304,110 @@ export class PlanService {
   getPlanAuditLog(planId: string) {
     return this.auditRepo.getByEntityId(planId);
   }
+
+  // ============================================
+  // Plan Completion Methods
+  // ============================================
+
+  /**
+   * Mark a plan as completed.
+   * Sets status to 'completed' and records completed_at timestamp.
+   * A plan can only be completed once.
+   * Logs 'complete' action to audit log.
+   * Returns null if plan not found or already completed.
+   */
+  completePlan(
+    id: string,
+    actor: string = DEFAULT_ACTOR
+  ): WeeklyPlanWithItems | null {
+    // Get plan info before completion for audit log
+    const oldPlan = this.planRepo.getById(id);
+    if (!oldPlan) return null;
+
+    // Check if already completed
+    if (oldPlan.completedAt) {
+      return null;
+    }
+
+    const plan = this.planRepo.completePlan(id);
+
+    if (plan) {
+      this.auditRepo.log({
+        actor,
+        action: 'update',
+        entityType: 'weekly_plan',
+        entityId: id,
+        details: {
+          action: 'complete',
+          week: plan.week,
+          completedAt: plan.completedAt,
+          itemCount: plan.items?.length ?? 0,
+          madeCount: plan.items?.filter(i => i.wasMade).length ?? 0,
+        },
+      });
+    }
+
+    return plan;
+  }
+
+  /**
+   * Get completed plan history.
+   * Returns plans that have been completed, ordered by completion date descending.
+   * No audit logging for read operations.
+   */
+  getCompletedPlans(limit?: number): WeeklyPlanWithItems[] {
+    return this.planRepo.getCompletedPlans(limit);
+  }
+
+  /**
+   * Mark a meal as made (was_made = true).
+   * Tracks which meals were actually cooked vs just planned.
+   * Logs 'mark_made' action to audit log.
+   * Returns null if meal not found.
+   */
+  markMealAsMade(
+    planId: string,
+    dayOfWeek: number,
+    mealType: MealType,
+    wasMade: boolean = true,
+    actor: string = DEFAULT_ACTOR
+  ): PlanItem | null {
+    const item = this.planRepo.markMealAsMade(planId, dayOfWeek, mealType, wasMade);
+
+    if (item) {
+      this.auditRepo.log({
+        actor,
+        action: 'update',
+        entityType: 'plan_item',
+        entityId: item.id,
+        details: {
+          action: wasMade ? 'mark_made' : 'unmark_made',
+          planId,
+          dayOfWeek,
+          mealType,
+          recipeId: item.recipeId,
+          wasMade,
+        },
+      });
+    }
+
+    return item;
+  }
+
+  /**
+   * Get all meals that were marked as made from completed plans.
+   * No audit logging for read operations.
+   */
+  getMadeMeals(limit?: number): PlanItem[] {
+    return this.planRepo.getMadeMeals(limit);
+  }
+
+  /**
+   * Get recently made recipe IDs (for suggestion penalty).
+   * Returns recipe IDs from meals marked as made within the given number of days.
+   * No audit logging for read operations.
+   */
+  getRecentlyMadeRecipeIds(daysBack: number = 14): string[] {
+    return this.planRepo.getRecentlyMadeRecipeIds(daysBack);
+  }
 }

@@ -65,6 +65,7 @@ export const WeeklyPlanSchema = z.object({
   notes: z.string().nullable(),
   createdAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)),
   updatedAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)),
+  completedAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)).nullable().optional(),
 });
 
 export type WeeklyPlan = z.infer<typeof WeeklyPlanSchema>;
@@ -103,6 +104,7 @@ export const PlanItemSchema = z.object({
   notes: z.string().nullable(),
   slotType: SlotTypeEnum.default('recipe'),
   leftoversSourceId: z.string().nullable().optional(),
+  wasMade: z.boolean().default(false),
 });
 
 export type PlanItem = z.infer<typeof PlanItemSchema>;

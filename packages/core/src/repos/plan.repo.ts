@@ -36,6 +36,7 @@ interface WeeklyPlanRow {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  completed_at: string | null;
 }
 
 /** Raw plan item row from database */
@@ -49,6 +50,7 @@ interface PlanItemRow {
   notes: string | null;
   slot_type: string | null;
   leftovers_source_id: string | null;
+  was_made: number | null;
 }
 
 /**
@@ -62,6 +64,7 @@ function rowToWeeklyPlan(row: WeeklyPlanRow): WeeklyPlan {
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    completedAt: row.completed_at,
   };
 }
 
@@ -79,6 +82,7 @@ function rowToPlanItem(row: PlanItemRow): PlanItem {
     notes: row.notes,
     slotType: (row.slot_type ?? 'recipe') as SlotType,
     leftoversSourceId: row.leftovers_source_id,
+    wasMade: row.was_made === 1,
   };
 }
 
@@ -375,5 +379,129 @@ export class PlanRepository {
     if (!row) return null;
 
     return rowToPlanItem(row);
+  }
+
+  // ============================================
+  // Plan Completion Methods
+  // ============================================
+
+  /**
+   * Mark a plan as completed
+   * Sets status to 'completed' and records completed_at timestamp
+   * Returns null if plan is already completed or not found
+   */
+  completePlan(id: string): WeeklyPlanWithItems | null {
+    const existing = this.getById(id);
+    if (!existing) return null;
+
+    // Prevent completing already completed plans
+    if (existing.completedAt) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+
+    this.db
+      .prepare(
+        `UPDATE weekly_plans SET status = 'completed', completed_at = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(now, now, id);
+
+    return this.getById(id);
+  }
+
+  /**
+   * Get completed plans (history)
+   * Returns plans with completed_at set, ordered by completion date descending
+   */
+  getCompletedPlans(limit?: number): WeeklyPlanWithItems[] {
+    let sql = `SELECT * FROM weekly_plans WHERE completed_at IS NOT NULL ORDER BY completed_at DESC`;
+    const params: number[] = [];
+
+    if (limit !== undefined) {
+      sql += ' LIMIT ?';
+      params.push(limit);
+    }
+
+    const rows = this.db.prepare(sql).all(...params) as WeeklyPlanRow[];
+
+    return rows.map((row) => {
+      const plan = rowToWeeklyPlan(row);
+      const items = this.getMeals(row.id);
+      return {
+        ...plan,
+        items,
+      };
+    });
+  }
+
+  /**
+   * Mark a meal as made (was_made = true)
+   * Returns the updated plan item or null if not found
+   */
+  markMealAsMade(
+    planId: string,
+    dayOfWeek: number,
+    mealType: MealType,
+    wasMade: boolean = true
+  ): PlanItem | null {
+    // Verify the meal exists
+    const existing = this.getMealBySlot(planId, dayOfWeek, mealType);
+    if (!existing) return null;
+
+    this.db
+      .prepare(
+        `UPDATE plan_items SET was_made = ? WHERE plan_id = ? AND day_of_week = ? AND meal_type = ?`
+      )
+      .run(wasMade ? 1 : 0, planId, dayOfWeek, mealType);
+
+    return this.getMealBySlot(planId, dayOfWeek, mealType);
+  }
+
+  /**
+   * Get all meals that were marked as made from completed plans
+   * Useful for tracking meal history and informing suggestions
+   */
+  getMadeMeals(limit?: number): PlanItem[] {
+    let sql = `
+      SELECT pi.* FROM plan_items pi
+      INNER JOIN weekly_plans wp ON pi.plan_id = wp.id
+      WHERE pi.was_made = 1 AND wp.completed_at IS NOT NULL
+      ORDER BY wp.completed_at DESC, pi.day_of_week
+    `;
+    const params: number[] = [];
+
+    if (limit !== undefined) {
+      sql += ' LIMIT ?';
+      params.push(limit);
+    }
+
+    const rows = this.db.prepare(sql).all(...params) as PlanItemRow[];
+    return rows.map(rowToPlanItem);
+  }
+
+  /**
+   * Get recently made recipe IDs (for suggestion penalty)
+   * Returns recipe IDs from meals marked as made within the given number of days
+   */
+  getRecentlyMadeRecipeIds(daysBack: number = 14): string[] {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+    const cutoffStr = cutoffDate.toISOString();
+
+    const rows = this.db
+      .prepare(
+        `
+        SELECT DISTINCT pi.recipe_id FROM plan_items pi
+        INNER JOIN weekly_plans wp ON pi.plan_id = wp.id
+        WHERE pi.was_made = 1
+          AND pi.recipe_id IS NOT NULL
+          AND wp.completed_at IS NOT NULL
+          AND wp.completed_at >= ?
+        `
+      )
+      .all(cutoffStr) as { recipe_id: string }[];
+
+    return rows.map((r) => r.recipe_id);
   }
 }

@@ -373,7 +373,15 @@ export class SuggestionService {
       checkVarietyRules: true,
     };
 
-    // Get recent meal history
+    // Get recently made recipes (meals that were actually cooked, not just planned)
+    // This provides more accurate history than just planned meals
+    const recentlyMadeRecipeIds = this.planRepo.getRecentlyMadeRecipeIds(RECENT_DAYS_THRESHOLD);
+    for (const recipeId of recentlyMadeRecipeIds) {
+      context.recentRecipeIds!.add(recipeId);
+    }
+
+    // Also include planned meals from recent plans as a fallback
+    // (for cases where plans haven't been completed yet)
     const recentMeals = this.getRecentMeals(mealType);
 
     for (const meal of recentMeals) {

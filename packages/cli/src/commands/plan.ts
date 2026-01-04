@@ -929,3 +929,185 @@ planCommand
       process.exit(1);
     }
   });
+
+// MARK-MADE command
+planCommand
+  .command('mark-made <week> <day> <meal>')
+  .description('Mark a meal as cooked (day: mon-sun, meal: breakfast/lunch/dinner)')
+  .option('--undo', 'Unmark the meal as made')
+  .action((week: string, day: string, meal: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const isoWeek = parseWeek(week);
+      const dayOfWeek = parseDay(day);
+      const mealType = parseMealType(meal);
+
+      const service = getPlanService(globalOpts.db);
+      const recipeService = getRecipeService(globalOpts.db);
+
+      // Get the plan
+      const plan = service.getPlanByWeek(isoWeek);
+      if (!plan) {
+        printError(`No plan found for week ${isoWeek}`);
+        process.exit(1);
+      }
+
+      // Mark the meal as made (or unmade if --undo)
+      const wasMade = !options.undo;
+      const item = service.markMealAsMade(plan.id, dayOfWeek, mealType, wasMade);
+
+      if (!item) {
+        printError(`No meal found for ${getDayName(dayOfWeek)} ${mealType} in week ${isoWeek}`);
+        process.exit(1);
+      }
+
+      if (globalOpts.json) {
+        printJson(item);
+      } else {
+        const recipeName = item.recipeId
+          ? recipeService.getRecipe(item.recipeId)?.title ?? item.recipeId
+          : 'meal';
+        const dayName = getDayName(dayOfWeek);
+
+        if (wasMade) {
+          printSuccess(`Marked ${dayName} ${mealType} (${recipeName}) as made for week ${isoWeek}`);
+        } else {
+          printSuccess(`Unmarked ${dayName} ${mealType} (${recipeName}) as made for week ${isoWeek}`);
+        }
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// COMPLETE command
+planCommand
+  .command('complete <week>')
+  .description('Mark a plan as completed (week can only be completed once)')
+  .action((week: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const isoWeek = parseWeek(week);
+      const service = getPlanService(globalOpts.db);
+
+      // Get the plan
+      const plan = service.getPlanByWeek(isoWeek);
+      if (!plan) {
+        printError(`No plan found for week ${isoWeek}`);
+        process.exit(1);
+      }
+
+      // Check if already completed
+      if (plan.completedAt) {
+        printError(`Plan for week ${isoWeek} is already completed (completed at ${plan.completedAt})`);
+        process.exit(1);
+      }
+
+      // Complete the plan
+      const completed = service.completePlan(plan.id);
+
+      if (!completed) {
+        printError('Failed to complete plan');
+        process.exit(1);
+      }
+
+      if (globalOpts.json) {
+        printJson(completed);
+      } else {
+        const madeCount = completed.items?.filter(i => i.wasMade).length ?? 0;
+        const totalCount = completed.items?.length ?? 0;
+        printSuccess(
+          `Completed plan for week ${isoWeek}. ${madeCount} of ${totalCount} meals marked as made.`
+        );
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// HISTORY command
+planCommand
+  .command('history')
+  .description('Show completed plan history')
+  .option('--limit <n>', 'Maximum number of plans to show', '10')
+  .action((options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const service = getPlanService(globalOpts.db);
+      const recipeService = getRecipeService(globalOpts.db);
+      const limit = parseInt(options.limit, 10) || 10;
+
+      const completedPlans = service.getCompletedPlans(limit);
+
+      if (completedPlans.length === 0) {
+        if (globalOpts.json) {
+          printJson({ plans: [], message: 'No completed plans found' });
+        } else {
+          console.log('');
+          console.log('No completed plans found.');
+          console.log('Use "meals plan complete <week>" to complete a plan.');
+          console.log('');
+        }
+        return;
+      }
+
+      if (globalOpts.json) {
+        printJson({
+          plans: completedPlans.map(plan => ({
+            id: plan.id,
+            week: plan.week,
+            status: plan.status,
+            completedAt: plan.completedAt,
+            itemCount: plan.items?.length ?? 0,
+            madeCount: plan.items?.filter(i => i.wasMade).length ?? 0,
+            items: plan.items?.map(item => ({
+              dayOfWeek: item.dayOfWeek,
+              day: getDayName(item.dayOfWeek),
+              mealType: item.mealType,
+              recipeId: item.recipeId,
+              wasMade: item.wasMade,
+            })),
+          })),
+        });
+      } else {
+        console.log('');
+        console.log('Completed Plan History');
+        console.log('='.repeat(50));
+        console.log('');
+
+        for (const plan of completedPlans) {
+          const madeCount = plan.items?.filter(i => i.wasMade).length ?? 0;
+          const totalCount = plan.items?.length ?? 0;
+          const completedDate = plan.completedAt
+            ? new Date(plan.completedAt).toLocaleDateString()
+            : 'Unknown';
+
+          console.log(`Week ${plan.week}`);
+          console.log(`  Completed: ${completedDate}`);
+          console.log(`  Meals made: ${madeCount} / ${totalCount}`);
+
+          // Show meals that were made
+          const madeMeals = plan.items?.filter(i => i.wasMade && i.recipeId) ?? [];
+          if (madeMeals.length > 0) {
+            console.log('  Made:');
+            for (const item of madeMeals) {
+              const recipe = item.recipeId ? recipeService.getRecipe(item.recipeId) : null;
+              const recipeName = recipe?.title ?? item.recipeId ?? 'Unknown';
+              const dayName = getDayName(item.dayOfWeek);
+              console.log(`    - ${dayName} ${item.mealType}: ${recipeName}`);
+            }
+          }
+
+          console.log('');
+        }
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });

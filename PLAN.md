@@ -2431,8 +2431,8 @@ pnpm --filter @meals/core test
 
 ### Ticket: T036 Implement plan completion and history
 - **Priority:** P2
-- **Status:** Pending
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T036
 - **Scope:** Track plan completion and meal history
 - **Acceptance Criteria:**
   - `meals plan complete <week>` - mark plan as completed
@@ -2442,7 +2442,22 @@ pnpm --filter @meals/core test
   - History informs suggestion algorithm (recently made penalty)
 - **Validation Steps:** Complete a plan, verify history, check suggestion scoring
 - **Notes:**
-  - Dependencies: T012 (plan service - done), T013 (suggestions - done)
+  - Orchestrator notes:
+    - Intended approach: Add completed_at timestamp to plans table, add was_made boolean to plan_items table via migration. Add CLI commands for complete, history, mark-made. Update suggestion algorithm to consider recently made recipes.
+    - Key constraints: Migration should add columns safely. Plan can only be completed once. mark-made tracks what was actually cooked vs planned.
+    - Dependencies: T012 (plan service - done), T013 (suggestions - done)
+    - Estimated complexity: moderate
+  - Original notes:
+    - Dependencies: T012 (plan service - done), T013 (suggestions - done)
+  - Implementation notes (Agent-T036):
+    - Created migration 004_plan_completion.sql: adds completed_at to weekly_plans and was_made to plan_items
+    - Updated WeeklyPlanSchema with completedAt field
+    - Updated PlanItemSchema with wasMade field
+    - Added plan repository methods: completePlan, getCompletedPlans, markMealAsMade, getMadeMeals, getRecentlyMadeRecipeIds
+    - Added plan service methods with audit logging
+    - Updated suggestion service to include recently made recipes (from was_made=true) in the penalty scoring
+    - Added CLI commands: mark-made, complete, history
+    - All validation steps passed: pnpm build, pnpm test, CLI commands tested successfully
 
 ### Ticket: T037 Implement recipe favorites
 - **Priority:** P3
