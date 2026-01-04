@@ -11,6 +11,7 @@ import {
   IngredientRepository,
   type RecipeWithRelations,
   type CreateRecipe,
+  type UpdateRecipe,
   type CreateRecipeIngredientInput,
   type ImportOptions,
 } from '@meals/core';
@@ -485,6 +486,138 @@ recipeCommand
       } else {
         printError('Failed to delete recipe');
         process.exit(1);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// UPDATE command
+recipeCommand
+  .command('update <id>')
+  .description('Update an existing recipe')
+  .option('--title <title>', 'New recipe title')
+  .option('--description <text>', 'New recipe description')
+  .option('--instructions <text>', 'New recipe instructions')
+  .option('--servings <n>', 'New number of servings')
+  .option('--prep-time <minutes>', 'New prep time in minutes')
+  .option('--cook-time <minutes>', 'New cook time in minutes')
+  .option('--cuisine <cuisine>', 'New cuisine type')
+  .option('--difficulty <level>', 'New difficulty level (easy, medium, hard)')
+  .option('--add-ingredient <ingredient>', 'Add ingredient (format: name:quantity unit) - can be repeated', (val: string, prev: string[] | undefined) => prev ? [...prev, val] : [val])
+  .option('--remove-ingredient <name>', 'Remove ingredient by name - can be repeated', (val: string, prev: string[] | undefined) => prev ? [...prev, val] : [val])
+  .option('--add-tag <tag>', 'Add tag (creates if not exists) - can be repeated', (val: string, prev: string[] | undefined) => prev ? [...prev, val] : [val])
+  .option('--remove-tag <tag>', 'Remove tag by name - can be repeated', (val: string, prev: string[] | undefined) => prev ? [...prev, val] : [val])
+  .action((id: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const { recipeService, tagRepo, ingredientRepo } = getServices(globalOpts.db);
+
+      // Check if recipe exists
+      const existingRecipe = recipeService.getRecipe(id);
+      if (!existingRecipe) {
+        printError(`Recipe not found: ${id}`);
+        process.exit(1);
+      }
+
+      // Build update data
+      const updateData: UpdateRecipe = { id };
+
+      if (options.title !== undefined) updateData.title = options.title;
+      if (options.description !== undefined) updateData.description = options.description;
+      if (options.instructions !== undefined) updateData.instructions = options.instructions;
+      if (options.servings !== undefined) updateData.servings = parseInt(options.servings, 10);
+      if (options.prepTime !== undefined) updateData.prepTimeMinutes = parseInt(options.prepTime, 10);
+      if (options.cookTime !== undefined) updateData.cookTimeMinutes = parseInt(options.cookTime, 10);
+      if (options.cuisine !== undefined) updateData.cuisine = options.cuisine;
+      if (options.difficulty !== undefined) updateData.difficulty = options.difficulty;
+
+      // Handle ingredient changes
+      let newIngredients: CreateRecipeIngredientInput[] | undefined;
+      const hasIngredientChanges = options.addIngredient || options.removeIngredient;
+
+      if (hasIngredientChanges) {
+        // Start with existing ingredients (default to empty array if undefined)
+        const existingIngredients = existingRecipe.ingredients ?? [];
+        newIngredients = existingIngredients.map((ing) => ({
+          ingredientId: ing.ingredientId,
+          quantity: ing.quantity,
+          unit: ing.unit,
+          notes: ing.notes,
+          optional: ing.optional,
+        }));
+
+        // Remove ingredients by name
+        if (options.removeIngredient) {
+          for (const nameToRemove of options.removeIngredient) {
+            const lowerName = nameToRemove.toLowerCase();
+            newIngredients = newIngredients.filter((ing) => {
+              const ingredient = ingredientRepo.getById(ing.ingredientId);
+              return ingredient ? ingredient.name.toLowerCase() !== lowerName : true;
+            });
+          }
+        }
+
+        // Add new ingredients
+        if (options.addIngredient) {
+          for (const ingredientStr of options.addIngredient) {
+            const parsed = parseIngredient(ingredientStr);
+            const ingredient = ingredientRepo.getOrCreate(parsed.name);
+            newIngredients.push({
+              ingredientId: ingredient.id,
+              quantity: parsed.quantity,
+              unit: parsed.unit,
+              notes: parsed.notes,
+            });
+          }
+        }
+      }
+
+      // Handle tag changes
+      let newTagIds: string[] | undefined;
+      const hasTagChanges = options.addTag || options.removeTag;
+
+      if (hasTagChanges) {
+        // Start with existing tags (default to empty array if undefined)
+        const existingTagIds = existingRecipe.tagIds ?? [];
+        newTagIds = [...existingTagIds];
+
+        // Remove tags by name
+        if (options.removeTag) {
+          for (const tagNameToRemove of options.removeTag) {
+            const lowerName = tagNameToRemove.toLowerCase();
+            newTagIds = newTagIds.filter((tagId) => {
+              const tag = tagRepo.getById(tagId);
+              return tag ? tag.name.toLowerCase() !== lowerName : true;
+            });
+          }
+        }
+
+        // Add new tags
+        if (options.addTag) {
+          const addedTagIds = tagRepo.resolveTagNames(options.addTag);
+          for (const tagId of addedTagIds) {
+            if (!newTagIds.includes(tagId)) {
+              newTagIds.push(tagId);
+            }
+          }
+        }
+      }
+
+      // Perform the update
+      const updatedRecipe = recipeService.updateRecipe(updateData, newIngredients, newTagIds);
+
+      if (!updatedRecipe) {
+        printError('Failed to update recipe');
+        process.exit(1);
+      }
+
+      if (globalOpts.json) {
+        printJson(updatedRecipe);
+      } else {
+        printSuccess(`Updated recipe: ${updatedRecipe.title} (${updatedRecipe.id})`);
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');

@@ -2281,8 +2281,8 @@ pnpm --filter @meals/core test
 
 ### Ticket: T029 Implement recipe update CLI command
 - **Priority:** P2
-- **Status:** Pending
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T029
 - **Scope:** Add `meals recipe update <id>` command to modify existing recipes
 - **Acceptance Criteria:**
   - Can update title, description, instructions, servings, prep/cook time, cuisine, difficulty
@@ -2291,7 +2291,21 @@ pnpm --filter @meals/core test
   - Changes are audit logged
 - **Validation Steps:** Update a recipe, verify changes with `meals recipe show`
 - **Notes:**
-  - Dependencies: T018 (recipe CLI - done)
+  - Orchestrator notes:
+    - Intended approach: Add update subcommand to recipe CLI with options for each field. Use RecipeService.update() method. Audit log changes.
+    - Key constraints: Must check recipe exists before updating. Ingredients use format "name:quantity unit". Tags are simple strings.
+    - Dependencies: T018 (recipe CLI - done)
+    - Estimated complexity: moderate
+  - Original notes:
+    - Dependencies: T018 (recipe CLI - done)
+  - Agent-T029 implementation notes (2026-01-04):
+    - Added UPDATE command to packages/cli/src/commands/recipe.ts
+    - Supports all field updates: --title, --description, --instructions, --servings, --prep-time, --cook-time, --cuisine, --difficulty
+    - Supports ingredient modification: --add-ingredient "name:quantity unit", --remove-ingredient "name"
+    - Supports tag modification: --add-tag "tagname", --remove-tag "tagname"
+    - Uses RecipeService.updateRecipe() which handles audit logging
+    - Properly checks recipe exists before updating
+    - All validation steps passed: pnpm build, pnpm test (433 tests), manual CLI testing
 
 ### Ticket: T030 Implement ingredient category management
 - **Priority:** P2
