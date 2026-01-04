@@ -279,6 +279,45 @@ export class RecipeService {
   }
 
   /**
+   * Toggle a recipe's favorite status.
+   * Returns the recipe with updated favorite status.
+   * Logs 'favorite' or 'unfavorite' action to audit log.
+   */
+  toggleFavorite(
+    recipeId: string,
+    actor: string = DEFAULT_ACTOR
+  ): RecipeWithRelations {
+    const recipe = this.recipeRepo.getById(recipeId);
+    if (!recipe) {
+      throw new Error(`Recipe not found: ${recipeId}`);
+    }
+
+    const newStatus = this.recipeRepo.toggleFavorite(recipeId);
+
+    this.auditRepo.log({
+      actor,
+      action: newStatus ? 'favorite' : 'unfavorite',
+      entityType: 'recipe',
+      entityId: recipeId,
+      details: {
+        title: recipe.title,
+        isFavorite: newStatus,
+      },
+    });
+
+    // Return updated recipe
+    return this.recipeRepo.getById(recipeId)!;
+  }
+
+  /**
+   * Get all favorite recipe IDs.
+   * Useful for building suggestion context.
+   */
+  getFavoriteRecipeIds(): string[] {
+    return this.recipeRepo.listFavoriteIds();
+  }
+
+  /**
    * Scale a recipe to a different number of servings.
    * Returns a copy of the recipe with all ingredient quantities multiplied
    * by (targetServings / originalServings).

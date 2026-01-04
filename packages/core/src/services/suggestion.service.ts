@@ -429,9 +429,11 @@ export class SuggestionService {
       }
     }
 
-    // Note: favoriteRecipeIds would come from a favorites tracking feature
-    // which could be added via tags or a separate favorites table.
-    // For now, it remains empty but the scoring logic is in place.
+    // Get favorite recipe IDs from the is_favorite column
+    const favoriteIds = this.recipeRepo.listFavoriteIds();
+    for (const id of favoriteIds) {
+      context.favoriteRecipeIds!.add(id);
+    }
 
     return context;
   }

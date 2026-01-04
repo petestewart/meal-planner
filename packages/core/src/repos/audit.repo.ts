@@ -26,7 +26,7 @@ export type AuditActor =
 /**
  * Valid action types for audit logging.
  */
-export type AuditAction = 'create' | 'update' | 'delete';
+export type AuditAction = 'create' | 'update' | 'delete' | 'favorite' | 'unfavorite';
 
 /**
  * Options for flexible audit log queries.

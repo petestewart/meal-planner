@@ -52,6 +52,7 @@ export const RecipeSchema = z.object({
   sourceType: SourceTypeEnum.nullable(),
   cuisine: z.string().nullable(),
   difficulty: DifficultyEnum.nullable(),
+  isFavorite: z.boolean().default(false),
   createdAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)),
   updatedAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)),
 });
@@ -59,10 +60,12 @@ export const RecipeSchema = z.object({
 export type Recipe = z.infer<typeof RecipeSchema>;
 
 /**
- * Schema for creating a new recipe (without id and timestamps).
+ * Schema for creating a new recipe (without id, timestamps, and isFavorite).
+ * isFavorite defaults to false and is set via the favorite toggle command.
  */
 export const CreateRecipeSchema = RecipeSchema.omit({
   id: true,
+  isFavorite: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -70,8 +73,10 @@ export type CreateRecipe = z.infer<typeof CreateRecipeSchema>;
 
 /**
  * Schema for updating a recipe (all fields optional except id).
+ * isFavorite is omitted as it's managed via the favorite toggle command.
  */
 export const UpdateRecipeSchema = RecipeSchema.omit({
+  isFavorite: true,
   createdAt: true,
   updatedAt: true,
 }).partial().required({ id: true });

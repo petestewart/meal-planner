@@ -31,6 +31,7 @@ const ListRecipesQuerySchema = z.object({
   q: z.string().optional(),
   tags: z.string().optional(), // Comma-separated tag IDs
   cuisine: z.string().optional(),
+  favorites: z.coerce.boolean().optional(), // Filter by favorites only
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
 });
@@ -117,7 +118,7 @@ export async function recipeRoutes(server: FastifyInstance): Promise<void> {
         );
       }
 
-      const { q, tags, cuisine, page, limit } = parseResult.data;
+      const { q, tags, cuisine, favorites, page, limit } = parseResult.data;
 
       // Build list options
       const options: ListRecipesOptions = {
@@ -137,11 +138,16 @@ export async function recipeRoutes(server: FastifyInstance): Promise<void> {
         options.cuisine = cuisine;
       }
 
+      if (favorites) {
+        options.favoritesOnly = true;
+      }
+
       const recipes = recipeService.listRecipes(options);
       const total = recipeService.countRecipes({
         search: options.search,
         tagIds: options.tagIds,
         cuisine: options.cuisine,
+        favoritesOnly: options.favoritesOnly,
       });
 
       return reply.send(
@@ -241,6 +247,35 @@ export async function recipeRoutes(server: FastifyInstance): Promise<void> {
       }
 
       return reply.send(successResponse(scaledRecipe));
+    }
+  );
+
+  /**
+   * POST /api/recipes/:id/favorite - Toggle recipe favorite status
+   *
+   * Returns the updated recipe with the new favorite status.
+   */
+  server.post(
+    '/api/recipes/:id/favorite',
+    async (
+      request: FastifyRequest<{ Params: { id: string } }>,
+      reply: FastifyReply
+    ) => {
+      const { id } = request.params;
+
+      try {
+        const recipe = recipeService.toggleFavorite(id, 'api');
+        return reply.send(successResponse({
+          id: recipe.id,
+          title: recipe.title,
+          isFavorite: recipe.isFavorite,
+        }));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('not found')) {
+          throw new ApiError('NOT_FOUND', `Recipe with ID '${id}' not found`);
+        }
+        throw error;
+      }
     }
   );
 

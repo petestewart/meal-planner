@@ -318,6 +318,7 @@ recipeCommand
   .option('-q, --query <text>', 'Search query')
   .option('-t, --tag <tag>', 'Filter by tag (can be repeated)', (val: string, prev: string[] | undefined) => prev ? [...prev, val] : [val])
   .option('--cuisine <cuisine>', 'Filter by cuisine')
+  .option('-f, --favorites', 'Show only favorite recipes')
   .option('-l, --limit <n>', 'Limit results', '20')
   .action((options, command) => {
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
@@ -350,6 +351,7 @@ recipeCommand
         search: options.query,
         tagIds,
         cuisine: options.cuisine,
+        favoritesOnly: options.favorites,
         limit: parseInt(options.limit, 10),
       });
 
@@ -357,7 +359,11 @@ recipeCommand
         printJson(recipes);
       } else {
         if (recipes.length === 0) {
-          console.log('No recipes found.');
+          if (options.favorites) {
+            console.log('No favorite recipes found.');
+          } else {
+            console.log('No recipes found.');
+          }
           return;
         }
 
@@ -365,18 +371,47 @@ recipeCommand
           recipes.map((r) => ({
             id: r.id,
             title: r.title,
+            fav: r.isFavorite ? '*' : '',
             time: formatTime(r.prepTimeMinutes, r.cookTimeMinutes),
             cuisine: r.cuisine || '-',
           })),
           [
             { key: 'id', header: 'ID', width: 36 },
             { key: 'title', header: 'TITLE', width: 30 },
+            { key: 'fav', header: 'FAV', width: 3 },
             { key: 'time', header: 'TIME', width: 20 },
             { key: 'cuisine', header: 'CUISINE', width: 15 },
           ]
         );
 
         console.log(`\nShowing ${recipes.length} recipe(s).`);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// FAVORITE command
+recipeCommand
+  .command('favorite <id>')
+  .description('Toggle favorite status for a recipe')
+  .action((id: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const { recipeService } = getServices(globalOpts.db);
+
+      const recipe = recipeService.toggleFavorite(id, 'cli');
+
+      if (globalOpts.json) {
+        printJson({ id: recipe.id, title: recipe.title, isFavorite: recipe.isFavorite });
+      } else {
+        if (recipe.isFavorite) {
+          printSuccess(`Added "${recipe.title}" to favorites`);
+        } else {
+          printSuccess(`Removed "${recipe.title}" from favorites`);
+        }
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');

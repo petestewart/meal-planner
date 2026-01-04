@@ -34,6 +34,8 @@ export interface ListRecipesOptions {
   tagIds?: string[];
   /** Search in title/description/instructions */
   search?: string;
+  /** Filter by favorite status */
+  favoritesOnly?: boolean;
   /** Limit number of results */
   limit?: number;
   /** Offset for pagination */
@@ -53,6 +55,7 @@ interface RecipeRow {
   source_type: string | null;
   cuisine: string | null;
   difficulty: string | null;
+  is_favorite: number;
   created_at: string;
   updated_at: string;
 }
@@ -90,6 +93,7 @@ function rowToRecipe(row: RecipeRow): Recipe {
     sourceType: row.source_type as Recipe['sourceType'],
     cuisine: row.cuisine,
     difficulty: row.difficulty as Recipe['difficulty'],
+    isFavorite: row.is_favorite === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -227,7 +231,7 @@ export class RecipeRepository {
    * results by relevance (FTS5 rank). Otherwise, orders by created_at.
    */
   list(options: ListRecipesOptions = {}): RecipeWithRelations[] {
-    const { cuisine, difficulty, tagIds, search, limit, offset } = options;
+    const { cuisine, difficulty, tagIds, search, favoritesOnly, limit, offset } = options;
 
     const params: (string | number)[] = [];
     const conditions: string[] = [];
@@ -275,6 +279,11 @@ export class RecipeRepository {
     if (difficulty) {
       conditions.push('r.difficulty = ?');
       params.push(difficulty);
+    }
+
+    // Filter by favorites only
+    if (favoritesOnly) {
+      conditions.push('r.is_favorite = 1');
     }
 
     if (conditions.length > 0) {
@@ -465,7 +474,7 @@ export class RecipeRepository {
    * When search is provided, uses FTS5 for full-text search matching.
    */
   count(options: Omit<ListRecipesOptions, 'limit' | 'offset'> = {}): number {
-    const { cuisine, difficulty, tagIds, search } = options;
+    const { cuisine, difficulty, tagIds, search, favoritesOnly } = options;
 
     const params: (string | number)[] = [];
     const conditions: string[] = [];
@@ -506,11 +515,67 @@ export class RecipeRepository {
       params.push(difficulty);
     }
 
+    if (favoritesOnly) {
+      conditions.push('r.is_favorite = 1');
+    }
+
     if (conditions.length > 0) {
       sql += ' WHERE ' + conditions.join(' AND ');
     }
 
     const row = this.db.prepare(sql).get(...params) as { count: number };
     return row.count;
+  }
+
+  /**
+   * Toggle a recipe's favorite status.
+   * Returns the new favorite status (true if now favorited, false if unfavorited).
+   */
+  toggleFavorite(id: string): boolean {
+    const now = new Date().toISOString();
+
+    // Get current status
+    const row = this.db
+      .prepare('SELECT is_favorite FROM recipes WHERE id = ?')
+      .get(id) as { is_favorite: number } | undefined;
+
+    if (!row) {
+      throw new Error(`Recipe not found: ${id}`);
+    }
+
+    const newStatus = row.is_favorite === 1 ? 0 : 1;
+
+    this.db
+      .prepare('UPDATE recipes SET is_favorite = ?, updated_at = ? WHERE id = ?')
+      .run(newStatus, now, id);
+
+    return newStatus === 1;
+  }
+
+  /**
+   * Set a recipe's favorite status directly.
+   */
+  setFavorite(id: string, isFavorite: boolean): void {
+    const now = new Date().toISOString();
+
+    const result = this.db
+      .prepare('UPDATE recipes SET is_favorite = ?, updated_at = ? WHERE id = ?')
+      .run(isFavorite ? 1 : 0, now, id);
+
+    if (result.changes === 0) {
+      throw new Error(`Recipe not found: ${id}`);
+    }
+  }
+
+  /**
+   * Get all favorite recipe IDs.
+   * Useful for building suggestion context.
+   */
+  listFavoriteIds(): string[] {
+    const rows = this.db
+      .prepare('SELECT id FROM recipes WHERE is_favorite = 1')
+      .all() as { id: string }[];
+
+    return rows.map((r) => r.id);
   }
 }

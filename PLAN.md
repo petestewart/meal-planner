@@ -2478,8 +2478,8 @@ pnpm --filter @meals/core test
 
 ### Ticket: T037 Implement recipe favorites
 - **Priority:** P3
-- **Status:** Pending
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-T037
 - **Scope:** Mark recipes as favorites for quick access
 - **Acceptance Criteria:**
   - `meals recipe favorite <id>` - toggle favorite status
@@ -2488,8 +2488,24 @@ pnpm --filter @meals/core test
   - API endpoints for favoriting
 - **Validation Steps:** Favorite recipes, verify filtering and suggestion boost
 - **Notes:**
-  - Dependencies: T009 (recipe service - done), T013 (suggestions - done)
-  - Add `is_favorite` boolean to recipes table
+  - Orchestrator notes:
+    - Intended approach: Add is_favorite column to recipes table via migration, add favorite CLI command, add --favorites filter to list, update suggestion algorithm to boost favorites, add API endpoint.
+    - Key constraints: Toggle behavior for favorite command. Suggestion boost should be meaningful but not overwhelming.
+    - Dependencies: T009 (recipe service - done), T013 (suggestions - done)
+    - Estimated complexity: simple-moderate
+  - Original notes:
+    - Dependencies: T009 (recipe service - done), T013 (suggestions - done)
+    - Add `is_favorite` boolean to recipes table
+  - Implementation notes (Agent-T037):
+    - Created migration 007_recipe_favorites.sql: adds is_favorite INTEGER column to recipes table with index
+    - Updated RecipeSchema with isFavorite field (omitted from CreateRecipeSchema and UpdateRecipeSchema)
+    - Added repository methods: toggleFavorite, setFavorite, listFavoriteIds
+    - Added service method toggleFavorite with audit logging (favorite/unfavorite actions)
+    - Updated ListRecipesOptions to support favoritesOnly filter
+    - Updated suggestion service buildContext to populate favoriteRecipeIds from database (enables FAVORITE_BOOST scoring)
+    - Added CLI: recipe favorite <id> command (toggle), recipe list --favorites flag
+    - Added API: POST /api/recipes/:id/favorite endpoint, favorites query param for GET /api/recipes
+    - All validation steps passed: pnpm build, pnpm test, CLI commands tested successfully
 
 ### Ticket: T038 Increase test coverage to 80%
 - **Priority:** P2
