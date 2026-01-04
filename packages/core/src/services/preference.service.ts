@@ -12,6 +12,9 @@ import {
   type PreferenceKey,
   type UserPreferences,
   type PlanningHeuristics,
+  type AllergyEntry,
+  type CuisinePreferences,
+  type PrepDay,
   DEFAULT_PREFERENCES,
   parsePreferenceValue,
   validatePreferenceValue,
@@ -253,6 +256,43 @@ export class PreferenceService {
     return this.getPreference('planningHeuristics');
   }
 
+  // New enhanced preference getters (T044)
+
+  /**
+   * Get household size.
+   */
+  getHouseholdSize(): number {
+    return this.getPreference('householdSize');
+  }
+
+  /**
+   * Get meal types to plan.
+   */
+  getMealTypes(): string[] {
+    return this.getPreference('mealTypes');
+  }
+
+  /**
+   * Get allergies with severity levels.
+   */
+  getAllergies(): AllergyEntry[] {
+    return this.getPreference('allergies');
+  }
+
+  /**
+   * Get preferred prep day, or null if not set.
+   */
+  getPrepDay(): PrepDay | null {
+    return this.getPreference('prepDay');
+  }
+
+  /**
+   * Get cuisine preferences (liked and disliked).
+   */
+  getCuisinePreferences(): CuisinePreferences {
+    return this.getPreference('cuisinePreferences');
+  }
+
   // ========================
   // Convenience typed setters
   // ========================
@@ -315,6 +355,58 @@ export class PreferenceService {
     actor: string = DEFAULT_ACTOR
   ): PreferenceData {
     return this.setPreference('planningHeuristics', heuristics, actor);
+  }
+
+  // New enhanced preference setters (T044)
+
+  /**
+   * Set household size.
+   */
+  setHouseholdSize(
+    size: number,
+    actor: string = DEFAULT_ACTOR
+  ): PreferenceData {
+    return this.setPreference('householdSize', size, actor);
+  }
+
+  /**
+   * Set meal types to plan.
+   */
+  setMealTypes(
+    mealTypes: string[],
+    actor: string = DEFAULT_ACTOR
+  ): PreferenceData {
+    return this.setPreference('mealTypes', mealTypes, actor);
+  }
+
+  /**
+   * Set allergies with severity levels.
+   */
+  setAllergies(
+    allergies: AllergyEntry[],
+    actor: string = DEFAULT_ACTOR
+  ): PreferenceData {
+    return this.setPreference('allergies', allergies, actor);
+  }
+
+  /**
+   * Set preferred prep day.
+   */
+  setPrepDay(
+    prepDay: PrepDay | null,
+    actor: string = DEFAULT_ACTOR
+  ): PreferenceData {
+    return this.setPreference('prepDay', prepDay, actor);
+  }
+
+  /**
+   * Set cuisine preferences (liked and disliked).
+   */
+  setCuisinePreferences(
+    cuisinePreferences: CuisinePreferences,
+    actor: string = DEFAULT_ACTOR
+  ): PreferenceData {
+    return this.setPreference('cuisinePreferences', cuisinePreferences, actor);
   }
 
   /**

@@ -85,11 +85,21 @@ export {
   getDefaultPreference,
   validatePreferenceValue,
   parsePreferenceValue,
+  // Enhanced preference exports (T044)
+  AllergySeverityEnum,
+  AllergyEntrySchema,
+  CuisinePreferencesSchema,
+  PrepDayEnum,
   type PlanningHeuristics,
   type UserPreferences,
   type PreferenceKey,
   type PreferenceRow,
   type SetPreference,
+  // Enhanced preference types (T044)
+  type AllergySeverity,
+  type AllergyEntry,
+  type CuisinePreferences,
+  type PrepDay,
 } from './models/index.js';
 
 // Repositories

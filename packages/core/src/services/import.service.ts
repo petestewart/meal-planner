@@ -9,6 +9,8 @@ import * as cheerio from 'cheerio';
 import type { Database } from 'better-sqlite3';
 import type { CreateRecipe, Recipe } from '../models/index.js';
 import { RecipeService } from './recipe.service.js';
+import { IngredientRepository } from '../repos/ingredient.repo.js';
+import type { CreateRecipeIngredientInput } from '../repos/recipe.repo.js';
 
 /**
  * Input structure for creating a recipe from imported data.
@@ -203,8 +205,81 @@ function findRecipeInJsonLd(data: unknown): SchemaRecipe | null {
   return null;
 }
 
+/**
+ * Parse a raw ingredient string into components.
+ * Handles formats like:
+ *   "1 cup flour"
+ *   "2 tablespoons olive oil"
+ *   "1/2 teaspoon salt"
+ *   "3 large eggs"
+ *   "salt and pepper to taste"
+ */
+function parseIngredientString(raw: string): { name: string; quantity: number | null; unit: string | null } {
+  const trimmed = raw.trim();
+
+  // Common units to look for
+  const units = [
+    'cups?', 'tablespoons?', 'tbsp', 'teaspoons?', 'tsp',
+    'ounces?', 'oz', 'pounds?', 'lbs?', 'grams?', 'g',
+    'kilograms?', 'kg', 'milliliters?', 'ml', 'liters?', 'l',
+    'pinch(?:es)?', 'dash(?:es)?', 'cloves?', 'slices?', 'pieces?',
+    'cans?', 'packages?', 'bunche?s?', 'heads?', 'stalks?',
+    'sprigs?', 'leaves?', 'whole', 'large', 'medium', 'small',
+  ];
+  const unitPattern = units.join('|');
+
+  // Pattern: optional quantity (number, fraction, or range) + optional unit + ingredient name
+  // Examples: "1 cup flour", "1/2 tsp salt", "2-3 cloves garlic", "salt to taste"
+  const pattern = new RegExp(
+    `^([\\d\\/\\-\\.\\s]+)?\\s*(${unitPattern})?\\s*(.+)$`,
+    'i'
+  );
+
+  const match = trimmed.match(pattern);
+
+  if (!match) {
+    return { name: trimmed, quantity: null, unit: null };
+  }
+
+  const [, quantityStr, unit, name] = match;
+
+  // Parse quantity (handle fractions like "1/2", ranges like "2-3")
+  let quantity: number | null = null;
+  if (quantityStr) {
+    const cleanQty = quantityStr.trim();
+    if (cleanQty.includes('/')) {
+      // Handle fractions like "1/2" or "1 1/2"
+      const parts = cleanQty.split(/\s+/);
+      let total = 0;
+      for (const part of parts) {
+        if (part.includes('/')) {
+          const [num, denom] = part.split('/');
+          total += parseInt(num) / parseInt(denom);
+        } else {
+          total += parseFloat(part) || 0;
+        }
+      }
+      quantity = total;
+    } else if (cleanQty.includes('-')) {
+      // Handle ranges like "2-3", take the first number
+      const [first] = cleanQty.split('-');
+      quantity = parseFloat(first) || null;
+    } else {
+      quantity = parseFloat(cleanQty) || null;
+    }
+  }
+
+  return {
+    name: name?.trim() || trimmed,
+    quantity,
+    unit: unit?.toLowerCase() || null,
+  };
+}
+
 export class ImportService {
   private recipeService: RecipeService | null;
+  private ingredientRepo: IngredientRepository | null;
+  private db: Database | null;
 
   /**
    * Create an ImportService.
@@ -212,7 +287,9 @@ export class ImportService {
    *           If not provided, only parsing is available.
    */
   constructor(db?: Database) {
+    this.db = db ?? null;
     this.recipeService = db ? new RecipeService(db) : null;
+    this.ingredientRepo = db ? new IngredientRepository(db) : null;
   }
 
   /**
@@ -435,12 +512,28 @@ export class ImportService {
     };
 
     try {
-      // Note: We're not creating ingredients as structured data here.
-      // The raw ingredient strings are available in imported.ingredients
-      // but would need ingredient matching/creation logic to link them.
+      // Parse raw ingredient strings and create structured ingredients
+      let ingredients: CreateRecipeIngredientInput[] | undefined;
+
+      if (imported.ingredients.length > 0 && this.ingredientRepo) {
+        ingredients = [];
+        for (const rawIngredient of imported.ingredients) {
+          const parsed = parseIngredientString(rawIngredient);
+          // Get or create the ingredient in the database
+          const ingredient = this.ingredientRepo.getOrCreate(parsed.name);
+          ingredients.push({
+            ingredientId: ingredient.id,
+            quantity: parsed.quantity,
+            unit: parsed.unit,
+            notes: null,
+            optional: false,
+          });
+        }
+      }
+
       const recipe = this.recipeService.createRecipe(
         createRecipe,
-        undefined, // No structured ingredients
+        ingredients,
         undefined, // No tags
         actor || 'import'
       );

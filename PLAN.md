@@ -2312,7 +2312,7 @@ pnpm --filter @meals/core test
 - **Priority:** P2
 - **Status:** Pending
 - **Owner:** Unassigned
-- **Scope:** Track pantry items and subtract from grocery lists
+- **Scope:** Track pantry items (raw and prepared) and subtract from grocery lists
 - **Acceptance Criteria:**
   - `meals pantry list` - show current pantry items
   - `meals pantry add <ingredient> --quantity <n> --unit <u>` - add item
@@ -2320,10 +2320,21 @@ pnpm --filter @meals/core test
   - `meals pantry use <ingredient> --quantity <n>` - decrement quantity
   - `meals grocery generate --exclude-pantry` - subtract pantry from list
   - Expiration date tracking with `--expires <date>`
-- **Validation Steps:** Add pantry items, generate grocery list with exclusion
+  - Location tracking: `--location fridge|freezer|pantry`
+  - Prepared items: `--prepared --notes "sous vide, Jan 3"` for cooked/prepped items
+  - Staple items: `--staple` marks as always-have (auto-checked on grocery lists)
+  - `meals pantry expiring` - show items expiring within 7 days
+- **Validation Steps:** Add pantry items (raw and prepared), generate grocery list with exclusion
 - **Notes:**
   - Dependencies: T014 (grocery service - done)
-  - Schema already has `pantry_items` table
+  - Schema enhancement needed for pantry_items table:
+    ```sql
+    ALTER TABLE pantry_items ADD COLUMN is_prepared BOOLEAN DEFAULT FALSE;
+    ALTER TABLE pantry_items ADD COLUMN preparation_notes TEXT;
+    ALTER TABLE pantry_items ADD COLUMN location TEXT CHECK(location IN ('fridge', 'freezer', 'pantry'));
+    ALTER TABLE pantry_items ADD COLUMN is_staple BOOLEAN DEFAULT FALSE;
+    ```
+  - Prepared items useful for meal prep (e.g., "4 sous vide chicken breasts")
 
 ### Ticket: T032 Implement audit log viewing
 - **Priority:** P3
@@ -2447,6 +2458,335 @@ pnpm --filter @meals/core test
   - Dependencies: T024-T025 (agent tools - done)
   - New package: `packages/mcp-server/`
 
+### Ticket: T040 Support dining out, skip, and leftovers meal slots
+- **Priority:** P2
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** Allow marking meal slots as "dining out", "skip", or "leftovers" without requiring a new recipe
+- **Acceptance Criteria:**
+  - Add `slot_type` field to `plan_items` table: 'recipe' (default), 'dining_out', 'skip', 'leftovers'
+  - Add `leftovers_source_id` field to reference original meal for leftovers
+  - CLI: `meals plan set <week> <day> <meal> --dining-out` marks slot as dining out
+  - CLI: `meals plan set <week> <day> <meal> --skip` marks slot as skip
+  - CLI: `meals plan set <week> <day> <meal> --leftovers-from <day> <meal>` marks as leftovers from another meal
+  - Plan display shows "Dining Out", "Skip", or "Leftovers (from Mon dinner)" for these slots
+  - Grocery list generation ignores dining_out, skip, and leftovers slots
+  - Notes field can still be used (e.g., "Dinner at Mario's")
+- **Validation Steps:**
+  - `meals plan set this-week sat dinner --dining-out --notes "Restaurant TBD"`
+  - `meals plan set this-week tue lunch --leftovers-from mon dinner`
+  - `meals plan show` displays appropriate labels for each slot type
+  - Grocery list excludes non-recipe slots
+- **Notes:**
+  - Migration needed:
+    ```sql
+    ALTER TABLE plan_items ADD COLUMN slot_type TEXT DEFAULT 'recipe'
+      CHECK(slot_type IN ('recipe', 'dining_out', 'skip', 'leftovers'));
+    ALTER TABLE plan_items ADD COLUMN leftovers_source_id TEXT REFERENCES plan_items(id);
+    ```
+  - Update PlanItem model and schema
+  - Leftovers tracking helps with meal prep planning
+
+### Ticket: T041 Support batch cooking and meal prep tracking
+- **Priority:** P2
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** Track when multiple meals come from the same batch/prep session
+- **Acceptance Criteria:**
+  - Add `prep_batches` table: id, recipe_id, prep_date, total_servings, notes
+  - Add `batch_id` nullable foreign key to `plan_items`
+  - CLI: `meals prep create <recipe-id> --servings 16 --date sunday` creates a batch
+  - CLI: `meals plan set ... --batch <batch-id>` links meal to batch
+  - CLI: `meals prep list` shows active batches with remaining servings
+  - Plan display can optionally show batch info
+  - Grocery list aggregates by batch (don't duplicate ingredients for same batch)
+- **Validation Steps:**
+  - Create chili batch with 16 servings
+  - Assign 5 lunches to that batch
+  - Verify grocery list shows chili ingredients once (for 16 servings)
+  - `meals prep list` shows 6 servings remaining
+- **Notes:**
+  - Useful for meal prep workflows (Sunday cooking for the week)
+  - Could integrate with suggestion service to prefer using existing batches
+
+### Ticket: T042 Headless browser fallback for recipe import
+- **Priority:** P1
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** Use headless browser to import recipes from sites that block automated requests
+- **Acceptance Criteria:**
+  - Add `puppeteer` or `playwright` as optional dependency to `@meals/core`
+  - Modify `ImportService.fetchHtml()` to try native fetch first
+  - If fetch returns 403/blocking response, fall back to headless browser
+  - Headless browser renders page and extracts HTML for JSON-LD parsing
+  - CLI `meals recipe import <url>` works seamlessly with blocking sites (e.g., Food Network)
+  - Add `--no-browser` flag to skip headless fallback if needed
+- **Validation Steps:**
+  - `meals recipe import https://www.foodnetwork.com/recipes/...` succeeds
+  - Import still works for non-blocking sites without launching browser
+  - `--no-browser` flag causes 403 error on blocking sites (expected)
+- **Notes:**
+  - Puppeteer/Playwright adds ~150MB for browser binaries
+  - Consider lazy-loading the browser dependency
+  - May need to handle cookie consent dialogs on some sites
+
+### Ticket: T043 Recipe versioning and variations
+- **Priority:** P2
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** Allow recipes to be modified and saved as named versions/variations
+- **Acceptance Criteria:**
+  - Add `parent_recipe_id` and `version_name` columns to recipes table
+  - Original recipe remains unchanged; variations link back to parent
+  - CLI: `meals recipe fork <id> --name "sous vide"` creates a new version
+  - CLI: `meals recipe show <id>` displays version name and link to parent if applicable
+  - CLI: `meals recipe list --versions <id>` shows all versions of a recipe
+  - CLI: `meals recipe edit <id>` (from T029) works on any version
+  - Versions inherit source_url from parent but have source_type "variation"
+  - Recipe search includes all versions by default
+- **Validation Steps:**
+  - Fork "Chicken and Rice" as "sous vide" version
+  - Modify the forked recipe's instructions and ingredients
+  - `meals recipe show` on fork shows "Version: sous vide" and "Based on: Chicken and Rice"
+  - `meals recipe list --versions <parent-id>` shows original + all forks
+  - Both original and fork appear in search results
+- **Notes:**
+  - Use cases: cooking method variations (sous vide, instant pot), dietary variations (low-carb, dairy-free), ingredient substitutions
+  - Consider whether versions should be independently deletable or cascade
+  - Future: could add diff view between versions
+
+### Ticket: T044 Enhanced user preferences
+- **Priority:** P1
+- **Status:** Done
+- **Owner:** Agent-T044
+- **Scope:** Extend user preferences to support full meal planning configuration
+- **Acceptance Criteria:**
+  - Add new preference keys: `householdSize`, `mealTypes`, `allergies`, `prepDay`, `cuisinePreferences`
+  - `householdSize`: number (default: 2) - affects default servings calculations
+  - `mealTypes`: string[] (default: ["lunch", "dinner"]) - which meals to plan
+  - `allergies`: { ingredient: string, severity: "avoid" | "strict" }[] - with severity levels
+  - `prepDay`: string | null (default: null) - preferred prep day ("sunday", "saturday", etc.)
+  - `cuisinePreferences`: { liked: string[], disliked: string[] } - more granular than current
+  - CLI: `meals prefs set household-size 2`
+  - CLI: `meals prefs set meal-types lunch,dinner`
+  - CLI: `meals prefs set allergies "peanuts:strict,shellfish:avoid"`
+  - API: Enhanced PATCH /preferences endpoint
+- **Validation Steps:**
+  - Set all new preferences via CLI and API
+  - Verify suggestion algorithm respects allergies and cuisine preferences
+- **Notes:**
+  - Agent-T044 implementation notes:
+    - Files modified:
+      - packages/core/src/models/preference.ts: Added AllergySeverityEnum, AllergyEntrySchema, CuisinePreferencesSchema, PrepDayEnum. Extended UserPreferencesSchema and DEFAULT_PREFERENCES with new keys.
+      - packages/core/src/services/preference.service.ts: Added typed getters/setters for householdSize, mealTypes, allergies, prepDay, cuisinePreferences
+      - packages/cli/src/commands/prefs.ts: Added CLI key mapping, parseAllergies(), parseCuisinePreferences(), updated parseValue/formatValue
+      - packages/api/src/routes/preferences.ts: Extended UpdatePreferencesBodySchema with new fields
+      - packages/core/tests/preference.test.ts: Added comprehensive tests for new preferences
+    - Validation results:
+      - pnpm build: SUCCESS
+      - pnpm test: SUCCESS (444 tests pass)
+      - All CLI commands work correctly with proper formatting
+
+### Ticket: T045 Grocery list persistence and state tracking
+- **Priority:** P1
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** Persist grocery lists with item states for shopping workflow
+- **Acceptance Criteria:**
+  - New tables: `grocery_lists` and `grocery_list_items`
+  - Item states: `need_to_buy` (default), `already_have`, `partial`
+  - Partial state tracks `have_quantity` vs `need_quantity`
+  - Manual item addition (items not from recipes)
+  - `meals grocery generate` creates/updates persistent list
+  - `meals grocery list` shows current list with states
+  - `meals grocery check <item>` marks item as already_have
+  - `meals grocery check <item> --partial <qty>` marks as partial
+  - `meals grocery add <item> --quantity <n>` adds manual item
+  - `meals grocery check-pantry` bulk-marks items from pantry
+  - API: GET/PUT /api/grocery-list/:week/items/:id
+  - API: POST /api/grocery-list/:week/items (manual add)
+  - API: POST /api/grocery-list/:week/check-pantry
+- **Validation Steps:**
+  - Generate list, mark items, verify state persists
+  - Add manual item, verify it appears in list
+  - Check pantry, verify matching items marked
+- **Notes:**
+  - Migration: 002_grocery_list_persistence.sql
+  - Integrates with T031 (pantry) for check-pantry feature
+  - Schema:
+    ```sql
+    CREATE TABLE grocery_lists (
+      id TEXT PRIMARY KEY,
+      week TEXT NOT NULL UNIQUE,
+      generated_at TEXT,
+      updated_at TEXT
+    );
+    CREATE TABLE grocery_list_items (
+      id TEXT PRIMARY KEY,
+      grocery_list_id TEXT REFERENCES grocery_lists(id) ON DELETE CASCADE,
+      ingredient_id TEXT REFERENCES ingredients(id),
+      name TEXT,
+      quantity REAL,
+      unit TEXT,
+      status TEXT DEFAULT 'need_to_buy' CHECK(status IN ('need_to_buy', 'already_have', 'partial')),
+      have_quantity REAL,
+      is_manual BOOLEAN DEFAULT FALSE,
+      recipes TEXT
+    );
+    ```
+
+### Ticket: T046 Ingredient substitution engine
+- **Priority:** P2
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** Suggest ingredient alternatives when user lacks an ingredient
+- **Acceptance Criteria:**
+  - New table: `substitutions` with common substitution mappings
+  - Seed data for common substitutions (Lebanese 7 Spice → cumin+paprika, soy sauce → tamari, etc.)
+  - `meals substitution list <ingredient>` shows alternatives
+  - `meals substitution add <original> <substitute> --description "..."` adds user-defined
+  - API: GET /api/substitutions/:ingredient
+  - API: POST /api/substitutions (user-defined)
+  - Substitutions include dietary_tags (e.g., tamari enables "gluten-free")
+  - RecipeService can suggest substitutions for missing ingredients
+- **Validation Steps:**
+  - Query substitutions for "soy sauce", verify tamari suggested
+  - Add custom substitution, verify it's returned
+  - Check dietary tags are correctly applied
+- **Notes:**
+  - Migration: 003_substitutions.sql
+  - Seed common substitutions via migration or seed script
+  - Schema:
+    ```sql
+    CREATE TABLE substitutions (
+      id TEXT PRIMARY KEY,
+      original_ingredient TEXT NOT NULL,
+      substitute_ingredients TEXT NOT NULL,
+      substitute_description TEXT,
+      dietary_tags TEXT,
+      is_user_defined BOOLEAN DEFAULT FALSE,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_substitutions_original ON substitutions(original_ingredient);
+    ```
+
+### Ticket: T047 Recipe personal notes and modifications
+- **Priority:** P2
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** Allow users to add personal notes and ingredient overrides to recipes without modifying original
+- **Acceptance Criteria:**
+  - New table: `recipe_modifications` for per-recipe user customizations
+  - `meals recipe note <id> "Always double the garlic"` adds/updates note
+  - `meals recipe note <id> --show` displays current notes
+  - `meals recipe override <id> --ingredient "chicken thighs" --replace "chicken breast"` adds override
+  - Recipe show command displays modifications if present
+  - Modifications are applied when displaying recipe but don't change stored recipe
+  - API: GET/PUT /api/recipes/:id/modifications
+- **Validation Steps:**
+  - Add note to recipe, verify displayed with recipe
+  - Add ingredient override, verify shown in recipe display
+  - Verify original recipe data unchanged
+- **Notes:**
+  - Migration: 004_recipe_modifications.sql
+  - Useful for tracking personal tweaks without forking recipes
+  - Schema:
+    ```sql
+    CREATE TABLE recipe_modifications (
+      id TEXT PRIMARY KEY,
+      recipe_id TEXT NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+      user_notes TEXT,
+      ingredient_overrides TEXT,
+      instruction_notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(recipe_id)
+    );
+    ```
+
+### Ticket: T048 Recipe scaling API
+- **Priority:** P2
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** API endpoint to return recipe with ingredients scaled to specified servings
+- **Acceptance Criteria:**
+  - API: POST /api/recipes/:id/scale with body { servings: number }
+  - Returns recipe with all ingredient quantities multiplied by (newServings / originalServings)
+  - Handles unit conversions for readability (e.g., 1500g → 1.5kg)
+  - CLI: `meals recipe show <id> --servings 8` displays scaled recipe
+  - Does not modify stored recipe
+- **Validation Steps:**
+  - Scale 4-serving recipe to 8 servings, verify quantities doubled
+  - Scale down, verify fractions handled correctly
+  - Verify unit conversions applied (large quantities simplified)
+- **Notes:**
+  - Builds on existing unit conversion logic in GroceryService
+  - Useful for batch cooking calculations
+
+### Ticket: T049 Ingredient store sections
+- **Priority:** P2
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** Categorize ingredients by grocery store section for better list organization
+- **Acceptance Criteria:**
+  - Add `store_section` column to ingredients table
+  - Sections: Produce, Meat, Seafood, Dairy, Bakery, Frozen, Pantry, Beverages, Condiments, Spices, Other
+  - `meals ingredient set-section <name> <section>` sets ingredient section
+  - Grocery list groups by store_section instead of ingredient category
+  - Auto-assign common ingredients during import/creation
+  - API: PATCH /api/ingredients/:id with store_section
+- **Validation Steps:**
+  - Set sections for ingredients, verify grocery list grouped correctly
+  - Import recipe, verify common ingredients auto-categorized
+- **Notes:**
+  - Migration: 005_ingredient_store_sections.sql
+  - Extends T030 (ingredient categories) - store_section is for physical store layout
+  - Could add user-customizable section ordering
+
+### Ticket: T050 Meal side dish support
+- **Priority:** P2
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** Allow meals to have multiple components (main dish + sides)
+- **Acceptance Criteria:**
+  - Add `is_side_dish` and `main_item_id` columns to plan_items
+  - `meals plan set <week> <day> <meal> <recipe-id> --side` marks as side dish
+  - `meals plan add-side <week> <day> <meal> <recipe-id>` adds side to existing meal
+  - Plan display shows main dish with sides listed below
+  - Grocery list includes ingredients from all components
+  - Can have multiple sides per meal
+  - API: Enhanced PUT /api/plans/:week/meals/:day/:mealType with sides support
+- **Validation Steps:**
+  - Set main dish, add two sides, verify display
+  - Generate grocery list, verify all ingredients included
+  - Remove side, verify main dish unaffected
+- **Notes:**
+  - Migration: 006_meal_sides.sql
+  - Enables: "Chilean Sea Bass + Asparagus + Mashed Potatoes" as single meal
+  - Sides can be leftovers (e.g., mashed potatoes from previous prep)
+
+### Ticket: T051 Prep day aggregation service
+- **Priority:** P2
+- **Status:** Pending
+- **Owner:** Unassigned
+- **Scope:** Aggregate and organize prep tasks for designated prep day
+- **Acceptance Criteria:**
+  - `meals plan prep <week>` shows aggregated prep tasks
+  - Groups similar tasks (e.g., "Dice: 3 onions, 4 peppers")
+  - Orders tasks by dependencies and efficiency
+  - Shows total estimated prep time
+  - Lists equipment needed
+  - API: GET /api/plans/:week/prep-day
+  - Considers which recipes need full prep vs just assembly
+- **Validation Steps:**
+  - Create week plan, run prep command
+  - Verify ingredients aggregated, time estimated
+  - Verify logical task ordering
+- **Notes:**
+  - Uses prep_time_minutes from recipes for time estimates
+  - Could integrate with T041 (batch cooking) to show batch prep first
+  - Future: step-by-step guided prep mode
+
 ## 8. Completion Summary
 
 **Project Status:** MVP Complete - Enhancement Phase
@@ -2484,20 +2824,32 @@ pnpm --filter @meals/core test
 | T027 | Create backup script | Done |
 | T028 | Add vitest and configure testing | Done |
 
-### Pending Tickets (11 total)
+### Pending Tickets (23 total)
 
 | Ticket | Description | Priority | Status |
 |--------|-------------|----------|--------|
+| T042 | Headless browser fallback for recipe import | P1 | Pending |
+| T044 | Enhanced user preferences | P1 | Pending |
+| T045 | Grocery list persistence and state tracking | P1 | Pending |
 | T029 | Implement recipe update CLI command | P2 | Pending |
 | T030 | Implement ingredient category management | P2 | Pending |
 | T031 | Implement pantry service and CLI | P2 | Pending |
+| T036 | Implement plan completion and history | P2 | Pending |
+| T038 | Increase test coverage to 80% | P2 | Pending |
+| T040 | Support dining out and skip meal slots | P2 | Pending |
+| T041 | Support batch cooking and meal prep tracking | P2 | Pending |
+| T043 | Recipe versioning and variations | P2 | Pending |
+| T046 | Ingredient substitution engine | P2 | Pending |
+| T047 | Recipe personal notes and modifications | P2 | Pending |
+| T048 | Recipe scaling API | P2 | Pending |
+| T049 | Ingredient store sections | P2 | Pending |
+| T050 | Meal side dish support | P2 | Pending |
+| T051 | Prep day aggregation service | P2 | Pending |
 | T032 | Implement audit log viewing | P3 | Pending |
 | T033 | Implement database export to JSON | P3 | Pending |
 | T034 | Implement recipe rating system | P3 | Pending |
 | T035 | Implement tag management CLI | P3 | Pending |
-| T036 | Implement plan completion and history | P2 | Pending |
 | T037 | Implement recipe favorites | P3 | Pending |
-| T038 | Increase test coverage to 80% | P2 | Pending |
 | T039 | Implement MCP server for agent tools | P3 | Pending |
 
 ### Definition of Done Verification
@@ -2531,7 +2883,8 @@ pnpm --filter @meals/core test
 
 | Priority | Tickets | Features |
 |----------|---------|----------|
-| P2 | T029, T030, T031, T036, T038 | Recipe update, ingredient categories, pantry, plan history, test coverage |
+| P1 | T042, T044, T045 | Headless browser recipe import, enhanced user preferences, grocery list persistence |
+| P2 | T029, T030, T031, T036, T038, T040, T041, T043, T046, T047, T048, T049, T050, T051 | Recipe update/versioning, ingredient categories, pantry, plan history, test coverage, dining out, batch cooking, substitutions, recipe notes, scaling API, store sections, side dishes, prep day |
 | P3 | T032, T033, T034, T035, T037, T039 | Audit viewing, JSON export, ratings, tags, favorites, MCP server |
 
 ### Future Considerations (Not Yet Ticketed)

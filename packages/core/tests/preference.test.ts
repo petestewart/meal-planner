@@ -653,3 +653,191 @@ test('service.getPreferenceAuditLog returns all preference audit entries', () =>
   }
 });
 
+// ========================
+// Enhanced Preference Tests (T044)
+// ========================
+
+test('getDefaultPreference returns correct defaults for enhanced preferences', () => {
+  expect(getDefaultPreference('householdSize')).toStrictEqual(2);
+  expect(getDefaultPreference('mealTypes')).toStrictEqual(['lunch', 'dinner']);
+  expect(getDefaultPreference('allergies')).toStrictEqual([]);
+  expect(getDefaultPreference('prepDay')).toStrictEqual(null);
+  expect(getDefaultPreference('cuisinePreferences')).toStrictEqual({ liked: [], disliked: [] });
+});
+
+test('validatePreferenceValue validates enhanced preferences correctly', () => {
+  // householdSize
+  expect(validatePreferenceValue('householdSize', 4)).toStrictEqual(4);
+  expect(() => validatePreferenceValue('householdSize', -1)).toThrow();
+  expect(() => validatePreferenceValue('householdSize', 0)).toThrow();
+
+  // mealTypes
+  expect(validatePreferenceValue('mealTypes', ['breakfast', 'lunch', 'dinner'])).toStrictEqual(['breakfast', 'lunch', 'dinner']);
+  expect(() => validatePreferenceValue('mealTypes', 'not-an-array')).toThrow();
+
+  // allergies
+  expect(validatePreferenceValue('allergies', [{ ingredient: 'peanuts', severity: 'strict' }])).toStrictEqual([{ ingredient: 'peanuts', severity: 'strict' }]);
+  expect(validatePreferenceValue('allergies', [{ ingredient: 'shellfish', severity: 'avoid' }])).toStrictEqual([{ ingredient: 'shellfish', severity: 'avoid' }]);
+  expect(() => validatePreferenceValue('allergies', [{ ingredient: 'peanuts', severity: 'invalid' }])).toThrow();
+
+  // prepDay
+  expect(validatePreferenceValue('prepDay', 'sunday')).toStrictEqual('sunday');
+  expect(validatePreferenceValue('prepDay', 'saturday')).toStrictEqual('saturday');
+  expect(validatePreferenceValue('prepDay', null)).toStrictEqual(null);
+  expect(() => validatePreferenceValue('prepDay', 'invalid-day')).toThrow();
+
+  // cuisinePreferences
+  expect(validatePreferenceValue('cuisinePreferences', { liked: ['italian'], disliked: ['indian'] })).toStrictEqual({ liked: ['italian'], disliked: ['indian'] });
+});
+
+test('service.getHouseholdSize returns correct value', () => {
+  const { service, cleanup } = setupServiceTest();
+  try {
+    expect(service.getHouseholdSize()).toBe(2);
+
+    service.setHouseholdSize(4);
+    expect(service.getHouseholdSize()).toBe(4);
+  } finally {
+    cleanup();
+  }
+});
+
+test('service.getMealTypes returns correct value', () => {
+  const { service, cleanup } = setupServiceTest();
+  try {
+    expect(service.getMealTypes()).toStrictEqual(['lunch', 'dinner']);
+
+    service.setMealTypes(['breakfast', 'lunch', 'dinner']);
+    expect(service.getMealTypes()).toStrictEqual(['breakfast', 'lunch', 'dinner']);
+  } finally {
+    cleanup();
+  }
+});
+
+test('service.getAllergies returns correct value', () => {
+  const { service, cleanup } = setupServiceTest();
+  try {
+    expect(service.getAllergies()).toStrictEqual([]);
+
+    service.setAllergies([
+      { ingredient: 'peanuts', severity: 'strict' },
+      { ingredient: 'shellfish', severity: 'avoid' },
+    ]);
+    expect(service.getAllergies()).toStrictEqual([
+      { ingredient: 'peanuts', severity: 'strict' },
+      { ingredient: 'shellfish', severity: 'avoid' },
+    ]);
+  } finally {
+    cleanup();
+  }
+});
+
+test('service.getPrepDay returns correct value', () => {
+  const { service, cleanup } = setupServiceTest();
+  try {
+    expect(service.getPrepDay()).toBe(null);
+
+    service.setPrepDay('sunday');
+    expect(service.getPrepDay()).toBe('sunday');
+
+    service.setPrepDay('saturday');
+    expect(service.getPrepDay()).toBe('saturday');
+
+    service.setPrepDay(null);
+    expect(service.getPrepDay()).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('service.getCuisinePreferences returns correct value', () => {
+  const { service, cleanup } = setupServiceTest();
+  try {
+    expect(service.getCuisinePreferences()).toStrictEqual({ liked: [], disliked: [] });
+
+    service.setCuisinePreferences({
+      liked: ['italian', 'mexican'],
+      disliked: ['indian'],
+    });
+    expect(service.getCuisinePreferences()).toStrictEqual({
+      liked: ['italian', 'mexican'],
+      disliked: ['indian'],
+    });
+  } finally {
+    cleanup();
+  }
+});
+
+test('service.getAllPreferences includes enhanced preferences with defaults', () => {
+  const { service, cleanup } = setupServiceTest();
+  try {
+    const prefs = service.getAllPreferences();
+
+    expect(prefs.householdSize).toBe(2);
+    expect(prefs.mealTypes).toStrictEqual(['lunch', 'dinner']);
+    expect(prefs.allergies).toStrictEqual([]);
+    expect(prefs.prepDay).toBe(null);
+    expect(prefs.cuisinePreferences).toStrictEqual({ liked: [], disliked: [] });
+  } finally {
+    cleanup();
+  }
+});
+
+test('service.getAllPreferences merges stored enhanced preferences with defaults', () => {
+  const { service, cleanup } = setupServiceTest();
+  try {
+    service.setHouseholdSize(4);
+    service.setMealTypes(['breakfast', 'lunch', 'dinner']);
+    service.setAllergies([{ ingredient: 'peanuts', severity: 'strict' }]);
+    service.setPrepDay('sunday');
+    service.setCuisinePreferences({ liked: ['italian'], disliked: ['indian'] });
+
+    const prefs = service.getAllPreferences();
+
+    expect(prefs.householdSize).toBe(4);
+    expect(prefs.mealTypes).toStrictEqual(['breakfast', 'lunch', 'dinner']);
+    expect(prefs.allergies).toStrictEqual([{ ingredient: 'peanuts', severity: 'strict' }]);
+    expect(prefs.prepDay).toBe('sunday');
+    expect(prefs.cuisinePreferences).toStrictEqual({ liked: ['italian'], disliked: ['indian'] });
+  } finally {
+    cleanup();
+  }
+});
+
+test('enhanced preference setters create audit entries', () => {
+  const { db, service, cleanup } = setupServiceTest();
+  try {
+    service.setHouseholdSize(4, 'cli');
+    service.setMealTypes(['breakfast', 'lunch', 'dinner'], 'api');
+    service.setAllergies([{ ingredient: 'peanuts', severity: 'strict' }], 'user');
+    service.setPrepDay('sunday', 'agent:planner');
+    service.setCuisinePreferences({ liked: ['italian'], disliked: [] }, 'cli');
+
+    const auditEntries = getPreferenceAuditEntries(db);
+    expect(auditEntries.length).toBe(5);
+  } finally {
+    cleanup();
+  }
+});
+
+test('service.updatePreferences handles enhanced preferences', () => {
+  const { service, cleanup } = setupServiceTest();
+  try {
+    const result = service.updatePreferences({
+      householdSize: 3,
+      mealTypes: ['breakfast', 'dinner'],
+      allergies: [{ ingredient: 'shellfish', severity: 'avoid' }],
+      prepDay: 'saturday',
+      cuisinePreferences: { liked: ['mexican'], disliked: ['chinese'] },
+    });
+
+    expect(result.householdSize).toBe(3);
+    expect(result.mealTypes).toStrictEqual(['breakfast', 'dinner']);
+    expect(result.allergies).toStrictEqual([{ ingredient: 'shellfish', severity: 'avoid' }]);
+    expect(result.prepDay).toBe('saturday');
+    expect(result.cuisinePreferences).toStrictEqual({ liked: ['mexican'], disliked: ['chinese'] });
+  } finally {
+    cleanup();
+  }
+});
+

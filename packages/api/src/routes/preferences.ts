@@ -12,8 +12,12 @@ import {
   PreferenceService,
   getDb,
   PlanningHeuristicsSchema,
+  AllergyEntrySchema,
+  CuisinePreferencesSchema,
+  PrepDayEnum,
   type UserPreferences,
   type PlanningHeuristics,
+  type CuisinePreferences,
 } from '@meals/core';
 import { successResponse } from '../types.js';
 import { ApiError } from '../middleware/error-handler.js';
@@ -28,6 +32,12 @@ const UpdatePreferencesBodySchema = z.object({
   defaultServings: z.number().int().positive().optional(),
   maxPrepTimeMinutes: z.number().int().positive().nullable().optional(),
   planningHeuristics: PlanningHeuristicsSchema.partial().optional(),
+  // New enhanced preferences (T044)
+  householdSize: z.number().int().positive().optional(),
+  mealTypes: z.array(z.string()).optional(),
+  allergies: z.array(AllergyEntrySchema).optional(),
+  prepDay: PrepDayEnum.nullable().optional(),
+  cuisinePreferences: CuisinePreferencesSchema.partial().optional(),
 }).strict();
 
 /**
@@ -67,7 +77,11 @@ export async function preferenceRoutes(server: FastifyInstance): Promise<void> {
         );
       }
 
-      const { planningHeuristics: partialHeuristics, ...restUpdates } = parseResult.data;
+      const {
+        planningHeuristics: partialHeuristics,
+        cuisinePreferences: partialCuisinePrefs,
+        ...restUpdates
+      } = parseResult.data;
 
       // Build the update object with properly typed values
       const finalUpdates: Partial<UserPreferences> = { ...restUpdates };
@@ -81,6 +95,16 @@ export async function preferenceRoutes(server: FastifyInstance): Promise<void> {
           avoidRepeatInWeek: partialHeuristics.avoidRepeatInWeek ?? currentHeuristics.avoidRepeatInWeek,
         };
         finalUpdates.planningHeuristics = mergedHeuristics;
+      }
+
+      // Handle cuisinePreferences partial update specially (T044)
+      if (partialCuisinePrefs) {
+        const currentCuisinePrefs = preferenceService.getCuisinePreferences();
+        const mergedCuisinePrefs: CuisinePreferences = {
+          liked: partialCuisinePrefs.liked ?? currentCuisinePrefs.liked,
+          disliked: partialCuisinePrefs.disliked ?? currentCuisinePrefs.disliked,
+        };
+        finalUpdates.cuisinePreferences = mergedCuisinePrefs;
       }
 
       // Update preferences

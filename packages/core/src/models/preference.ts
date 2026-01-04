@@ -12,6 +12,44 @@ export const PlanningHeuristicsSchema = z.object({
 export type PlanningHeuristics = z.infer<typeof PlanningHeuristicsSchema>;
 
 /**
+ * Allergy severity levels
+ */
+export const AllergySeverityEnum = z.enum(['avoid', 'strict']);
+export type AllergySeverity = z.infer<typeof AllergySeverityEnum>;
+
+/**
+ * Single allergy entry with ingredient and severity
+ */
+export const AllergyEntrySchema = z.object({
+  ingredient: z.string(),
+  severity: AllergySeverityEnum,
+});
+export type AllergyEntry = z.infer<typeof AllergyEntrySchema>;
+
+/**
+ * Cuisine preferences with liked and disliked arrays
+ */
+export const CuisinePreferencesSchema = z.object({
+  liked: z.array(z.string()).default([]),
+  disliked: z.array(z.string()).default([]),
+});
+export type CuisinePreferences = z.infer<typeof CuisinePreferencesSchema>;
+
+/**
+ * Valid days for prep day preference
+ */
+export const PrepDayEnum = z.enum([
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+]);
+export type PrepDay = z.infer<typeof PrepDayEnum>;
+
+/**
  * Full user preferences schema matching PLAN.md Deliverable C.
  */
 export const UserPreferencesSchema = z.object({
@@ -24,6 +62,15 @@ export const UserPreferencesSchema = z.object({
     preferVariety: true,
     balanceCuisines: true,
     avoidRepeatInWeek: true,
+  }),
+  // New enhanced preferences (T044)
+  householdSize: z.number().int().positive().default(2),
+  mealTypes: z.array(z.string()).default(['lunch', 'dinner']),
+  allergies: z.array(AllergyEntrySchema).default([]),
+  prepDay: PrepDayEnum.nullable().default(null),
+  cuisinePreferences: CuisinePreferencesSchema.default({
+    liked: [],
+    disliked: [],
   }),
 });
 
@@ -39,6 +86,12 @@ export const PreferenceKeyEnum = z.enum([
   'defaultServings',
   'maxPrepTimeMinutes',
   'planningHeuristics',
+  // New enhanced preference keys (T044)
+  'householdSize',
+  'mealTypes',
+  'allergies',
+  'prepDay',
+  'cuisinePreferences',
 ]);
 
 export type PreferenceKey = z.infer<typeof PreferenceKeyEnum>;
@@ -56,6 +109,15 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
     preferVariety: true,
     balanceCuisines: true,
     avoidRepeatInWeek: true,
+  },
+  // New enhanced preference defaults (T044)
+  householdSize: 2,
+  mealTypes: ['lunch', 'dinner'],
+  allergies: [],
+  prepDay: null,
+  cuisinePreferences: {
+    liked: [],
+    disliked: [],
   },
 };
 
@@ -91,6 +153,12 @@ export const PreferenceValueSchemas = {
   defaultServings: z.number().int().positive(),
   maxPrepTimeMinutes: z.number().int().positive().nullable(),
   planningHeuristics: PlanningHeuristicsSchema,
+  // New enhanced preference value schemas (T044)
+  householdSize: z.number().int().positive(),
+  mealTypes: z.array(z.string()),
+  allergies: z.array(AllergyEntrySchema),
+  prepDay: PrepDayEnum.nullable(),
+  cuisinePreferences: CuisinePreferencesSchema,
 } as const;
 
 /**

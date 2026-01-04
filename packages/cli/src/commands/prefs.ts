@@ -7,6 +7,9 @@ import {
   DEFAULT_PREFERENCES,
   type PreferenceKey,
   type UserPreferences,
+  type AllergyEntry,
+  type CuisinePreferences,
+  type PrepDay,
 } from '@meals/core';
 import {
   printJson,
@@ -37,6 +40,12 @@ const KEY_MAP: Record<string, PreferenceKey> = {
   'default-servings': 'defaultServings',
   'max-prep-time': 'maxPrepTimeMinutes',
   'planning-heuristics': 'planningHeuristics',
+  // New enhanced preference keys (T044)
+  'household-size': 'householdSize',
+  'meal-types': 'mealTypes',
+  'allergies': 'allergies',
+  'prep-day': 'prepDay',
+  'cuisine-preferences': 'cuisinePreferences',
 };
 
 /**
@@ -49,6 +58,12 @@ const REVERSE_KEY_MAP: Record<PreferenceKey, string> = {
   'defaultServings': 'default-servings',
   'maxPrepTimeMinutes': 'max-prep-time',
   'planningHeuristics': 'planning-heuristics',
+  // New enhanced preference keys (T044)
+  'householdSize': 'household-size',
+  'mealTypes': 'meal-types',
+  'allergies': 'allergies',
+  'prepDay': 'prep-day',
+  'cuisinePreferences': 'cuisine-preferences',
 };
 
 /**
@@ -70,6 +85,97 @@ function parseKey(cliKey: string): PreferenceKey {
 }
 
 /**
+ * Valid prep days for validation
+ */
+const VALID_PREP_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+/**
+ * Parse allergies string in format "ingredient:severity,ingredient:severity"
+ * e.g., "peanuts:strict,shellfish:avoid"
+ */
+function parseAllergies(valueStr: string): AllergyEntry[] {
+  if (!valueStr || valueStr.trim() === '') {
+    return [];
+  }
+
+  const entries = valueStr.split(',').map((s) => s.trim()).filter(Boolean);
+  const allergies: AllergyEntry[] = [];
+
+  for (const entry of entries) {
+    const parts = entry.split(':');
+    if (parts.length !== 2) {
+      throw new Error(
+        `Invalid allergy format: "${entry}". Expected "ingredient:severity" (e.g., "peanuts:strict" or "shellfish:avoid")`
+      );
+    }
+
+    const ingredient = parts[0].trim();
+    const severity = parts[1].trim().toLowerCase();
+
+    if (severity !== 'avoid' && severity !== 'strict') {
+      throw new Error(
+        `Invalid allergy severity: "${severity}". Must be "avoid" or "strict".`
+      );
+    }
+
+    allergies.push({ ingredient, severity });
+  }
+
+  return allergies;
+}
+
+/**
+ * Parse cuisine preferences string in format "liked:cuisine1,cuisine2;disliked:cuisine3,cuisine4"
+ * or simple format for liked only: "cuisine1,cuisine2"
+ */
+function parseCuisinePreferences(valueStr: string): CuisinePreferences {
+  if (!valueStr || valueStr.trim() === '') {
+    return { liked: [], disliked: [] };
+  }
+
+  // Try JSON format first
+  if (valueStr.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(valueStr);
+      return {
+        liked: Array.isArray(parsed.liked) ? parsed.liked : [],
+        disliked: Array.isArray(parsed.disliked) ? parsed.disliked : [],
+      };
+    } catch {
+      throw new Error(
+        `Invalid cuisine-preferences JSON. Expected format: '{"liked":["italian"],"disliked":["indian"]}'`
+      );
+    }
+  }
+
+  // Try "liked:a,b;disliked:c,d" format
+  if (valueStr.includes(':')) {
+    const result: CuisinePreferences = { liked: [], disliked: [] };
+    const parts = valueStr.split(';');
+
+    for (const part of parts) {
+      const [category, cuisinesStr] = part.split(':').map((s) => s.trim());
+      if (category && cuisinesStr) {
+        const cuisines = cuisinesStr.split(',').map((s) => s.trim()).filter(Boolean);
+        if (category.toLowerCase() === 'liked') {
+          result.liked = cuisines;
+        } else if (category.toLowerCase() === 'disliked') {
+          result.disliked = cuisines;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  // Simple comma-separated format (all liked)
+  return {
+    liked: valueStr.split(',').map((s) => s.trim()).filter(Boolean),
+    disliked: [],
+  };
+}
+
+/**
  * Parse a value string based on the preference key type.
  */
 function parseValue(key: PreferenceKey, valueStr: string): UserPreferences[PreferenceKey] {
@@ -77,6 +183,7 @@ function parseValue(key: PreferenceKey, valueStr: string): UserPreferences[Prefe
     case 'dietaryRestrictions':
     case 'dislikedIngredients':
     case 'favoriteCuisines':
+    case 'mealTypes':
       // Comma-separated list
       return valueStr.split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -86,6 +193,13 @@ function parseValue(key: PreferenceKey, valueStr: string): UserPreferences[Prefe
         throw new Error(`Invalid servings value: "${valueStr}". Must be a positive integer.`);
       }
       return servings;
+
+    case 'householdSize':
+      const size = parseInt(valueStr, 10);
+      if (isNaN(size) || size < 1) {
+        throw new Error(`Invalid household-size value: "${valueStr}". Must be a positive integer.`);
+      }
+      return size;
 
     case 'maxPrepTimeMinutes':
       if (valueStr.toLowerCase() === 'null' || valueStr === '') {
@@ -97,6 +211,18 @@ function parseValue(key: PreferenceKey, valueStr: string): UserPreferences[Prefe
       }
       return minutes;
 
+    case 'prepDay':
+      if (valueStr.toLowerCase() === 'null' || valueStr === '') {
+        return null;
+      }
+      const day = valueStr.toLowerCase() as PrepDay;
+      if (!VALID_PREP_DAYS.includes(day)) {
+        throw new Error(
+          `Invalid prep-day value: "${valueStr}". Must be one of: ${VALID_PREP_DAYS.join(', ')}, or "null".`
+        );
+      }
+      return day;
+
     case 'planningHeuristics':
       // Parse as JSON
       try {
@@ -106,6 +232,12 @@ function parseValue(key: PreferenceKey, valueStr: string): UserPreferences[Prefe
           `Invalid planning-heuristics value. Expected JSON object, e.g., '{"varietyWeight":0.5}'`
         );
       }
+
+    case 'allergies':
+      return parseAllergies(valueStr);
+
+    case 'cuisinePreferences':
+      return parseCuisinePreferences(valueStr);
   }
 }
 
@@ -116,6 +248,28 @@ function formatValue(key: PreferenceKey, value: unknown): string {
   if (value === null) {
     return 'null';
   }
+
+  // Special formatting for allergies
+  if (key === 'allergies' && Array.isArray(value)) {
+    if (value.length === 0) {
+      return '(none)';
+    }
+    return value.map((a: AllergyEntry) => `${a.ingredient}:${a.severity}`).join(', ');
+  }
+
+  // Special formatting for cuisinePreferences
+  if (key === 'cuisinePreferences' && typeof value === 'object') {
+    const prefs = value as CuisinePreferences;
+    const parts: string[] = [];
+    if (prefs.liked.length > 0) {
+      parts.push(`liked: ${prefs.liked.join(', ')}`);
+    }
+    if (prefs.disliked.length > 0) {
+      parts.push(`disliked: ${prefs.disliked.join(', ')}`);
+    }
+    return parts.length > 0 ? parts.join('; ') : '(none)';
+  }
+
   if (Array.isArray(value)) {
     if (value.length === 0) {
       return '(none)';
