@@ -204,6 +204,17 @@ packages/web/
   - Dark mode toggle works
 - **Notes:**
   - Use shadcn/ui CLI to add components as needed
+  - Agent-U002 implementation notes:
+    - Installed Tailwind CSS 3.4.x, PostCSS, autoprefixer, tailwindcss-animate
+    - Configured tailwind.config.js with custom theme colors using CSS variables
+    - Created globals.css with Tailwind directives and light/dark mode CSS variables
+    - Initialized shadcn/ui with components.json (new-york style, CSS variables)
+    - Added components: Button, Card, Input, Dialog
+    - Created lib/utils.ts with cn() utility function
+    - Installed next-themes, created ThemeProvider component
+    - Updated layout.tsx with ThemeProvider (attribute="class", enableSystem)
+    - Updated page.tsx with demo showcasing all button variants, cards, input, and theme toggle
+    - Build succeeds, TypeScript types check, dev server runs on port 3001
 
 ### Ticket: U003 Create API client and TanStack Query setup
 - **Priority:** P0
