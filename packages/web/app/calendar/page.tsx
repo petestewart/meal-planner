@@ -1,11 +1,18 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Suspense, useCallback } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 import { WeekGrid } from '@/components/calendar';
+import { RecipeSelector, RecipeSelection } from '@/components/calendar/recipe-selector';
 import { getCurrentWeek } from '@/lib/week-utils';
 import { DayOfWeek, MealType, PlanItem } from '@/types/api';
+import { useSetMeal, usePreferences, useCreatePlan } from '@/lib/queries';
 import { Loader2 } from 'lucide-react';
+
+interface SelectedSlot {
+  day: DayOfWeek;
+  mealType: MealType;
+}
 
 function CalendarContent() {
   const searchParams = useSearchParams();
@@ -13,6 +20,18 @@ function CalendarContent() {
 
   // Get week from URL or use current week
   const week = searchParams.get('week') || getCurrentWeek();
+
+  // Modal state
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
+
+  // Fetch preferences for default servings
+  const { data: preferences } = usePreferences();
+  const defaultServings = preferences?.defaultServings || 2;
+
+  // API mutations
+  const setMealMutation = useSetMeal();
+  const createPlanMutation = useCreatePlan();
 
   // Handle week change - update URL
   const handleWeekChange = useCallback(
@@ -24,22 +43,62 @@ function CalendarContent() {
     [router, searchParams]
   );
 
-  // Handle slot click - for now just log
+  // Handle slot click - open selector to change meal
   const handleSlotClick = useCallback(
     (day: DayOfWeek, mealType: MealType, planItem?: PlanItem) => {
-      console.log('Slot clicked:', { day, mealType, planItem });
-      // TODO: Open recipe detail or edit modal
+      setSelectedSlot({ day, mealType });
+      setSelectorOpen(true);
     },
     []
   );
 
-  // Handle add meal click - for now just log
+  // Handle add meal click - open selector
   const handleAddMeal = useCallback(
     (day: DayOfWeek, mealType: MealType) => {
-      console.log('Add meal clicked:', { day, mealType });
-      // TODO: Open recipe selector modal
+      setSelectedSlot({ day, mealType });
+      setSelectorOpen(true);
     },
     []
+  );
+
+  // Handle recipe selection
+  const handleRecipeSelect = useCallback(
+    async (selection: RecipeSelection) => {
+      if (!selectedSlot) return;
+
+      try {
+        // Try to set the meal - if plan doesn't exist, create it first
+        await setMealMutation.mutateAsync({
+          week,
+          day: selectedSlot.day,
+          mealType: selectedSlot.mealType,
+          input: {
+            recipeId: selection.recipeId,
+            servings: selection.servings,
+          },
+        });
+      } catch (error: unknown) {
+        // If the plan doesn't exist (404), create it first then retry
+        if (error instanceof Error && error.message.includes('not found')) {
+          await createPlanMutation.mutateAsync({ week });
+          await setMealMutation.mutateAsync({
+            week,
+            day: selectedSlot.day,
+            mealType: selectedSlot.mealType,
+            input: {
+              recipeId: selection.recipeId,
+              servings: selection.servings,
+            },
+          });
+        } else {
+          console.error('Failed to set meal:', error);
+        }
+      }
+
+      setSelectorOpen(false);
+      setSelectedSlot(null);
+    },
+    [selectedSlot, week, setMealMutation, createPlanMutation]
   );
 
   return (
@@ -57,6 +116,18 @@ function CalendarContent() {
         onSlotClick={handleSlotClick}
         onAddMeal={handleAddMeal}
       />
+
+      {/* Recipe Selector Modal */}
+      {selectedSlot && (
+        <RecipeSelector
+          open={selectorOpen}
+          onOpenChange={setSelectorOpen}
+          onSelect={handleRecipeSelect}
+          dayOfWeek={selectedSlot.day}
+          mealType={selectedSlot.mealType}
+          defaultServings={defaultServings}
+        />
+      )}
     </div>
   );
 }
