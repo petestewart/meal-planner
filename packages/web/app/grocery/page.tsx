@@ -1,10 +1,21 @@
+'use client';
+
+import { GroceryListView } from '@/components/grocery';
+
+/**
+ * Grocery List Page
+ *
+ * Displays a categorized grocery list for the current week with:
+ * - Week navigation
+ * - Generate list button
+ * - Items grouped by store section
+ * - Tri-state checkboxes (need to buy, already have, partial)
+ * - Collapsed "Already Have" section
+ */
 export default function GroceryPage() {
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold">Grocery List</h1>
-      <p className="mt-2 text-muted-foreground">
-        Manage your shopping list and grocery items.
-      </p>
+      <GroceryListView />
     </div>
   );
 }
