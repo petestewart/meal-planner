@@ -428,8 +428,8 @@ packages/web/
 
 ### Ticket: U014 Implement shopping mode for grocery list
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U014
 - **Scope:** Create simplified shopping mode optimized for in-store use
 - **Acceptance Criteria:**
   - Toggle to enter shopping mode

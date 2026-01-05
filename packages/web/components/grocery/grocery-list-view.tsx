@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, ShoppingCart, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, ShoppingCart, Check, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -19,6 +19,7 @@ import {
 } from '@/lib/week-utils';
 import { GroceryCategoryGroup } from './grocery-category';
 import { GroceryItem } from './grocery-item';
+import { ShoppingModeView } from './shopping-mode';
 import { cn } from '@/lib/utils';
 
 interface GroceryListViewProps {
@@ -49,6 +50,7 @@ function groupByCategory(items: GroceryItemType[]): Map<string, GroceryItemType[
 export function GroceryListView({ initialWeek, className }: GroceryListViewProps) {
   const [week, setWeek] = React.useState(initialWeek || getCurrentWeek());
   const [alreadyHaveOpen, setAlreadyHaveOpen] = React.useState(false);
+  const [isShoppingMode, setIsShoppingMode] = React.useState(false);
 
   const {
     data: groceryList,
@@ -95,6 +97,17 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
   const totalItems = groceryList?.items?.length || 0;
   const checkedItems = alreadyHaveItems.length;
 
+  // Render shopping mode if active
+  if (isShoppingMode && groceryList?.items) {
+    return (
+      <ShoppingModeView
+        items={groceryList.items}
+        week={week}
+        onExit={() => setIsShoppingMode(false)}
+      />
+    );
+  }
+
   return (
     <div className={cn('flex flex-col gap-6', className)}>
       {/* Header */}
@@ -107,6 +120,18 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Shopping Mode button - only show when there are active items */}
+          {activeItems.length > 0 && (
+            <Button
+              variant="default"
+              onClick={() => setIsShoppingMode(true)}
+              className="gap-2"
+            >
+              <ShoppingBag className="h-4 w-4" />
+              <span className="hidden sm:inline">Shopping Mode</span>
+              <span className="sm:hidden">Shop</span>
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={handleGenerate}

@@ -7,3 +7,4 @@
 export { GroceryItem } from './grocery-item';
 export { GroceryCategory, GroceryCategoryGroup } from './grocery-category';
 export { GroceryListView } from './grocery-list-view';
+export { ShoppingModeView, ShoppingItem, ShoppingCategory } from './shopping-mode';
