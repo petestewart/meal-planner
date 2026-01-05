@@ -1,11 +1,24 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { usePlan, usePreferences } from '@/lib/queries';
+import { usePlan, usePreferences, useSetMeal, queryKeys } from '@/lib/queries';
 import { useRecipes } from '@/lib/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import { MealSlot } from './meal-slot';
+import type { DropData } from './meal-slot';
+import { RecipeCard, type DragData } from './recipe-card';
 import {
   getCurrentWeek,
   getWeekDates,
@@ -18,7 +31,7 @@ import {
   isToday,
   getDayOfWeek,
 } from '@/lib/week-utils';
-import { MealType, DayOfWeek, PlanItem, RecipeWithRelations } from '@/types/api';
+import { MealType, DayOfWeek, PlanItem, RecipeWithRelations, WeeklyPlanWithItems } from '@/types/api';
 import { cn } from '@/lib/utils';
 
 interface WeekGridProps {
@@ -41,6 +54,27 @@ export function WeekGrid({
   onAddMeal,
 }: WeekGridProps) {
   const [currentWeek, setCurrentWeek] = useState(initialWeek || getCurrentWeek());
+  const [activeDragData, setActiveDragData] = useState<DragData | null>(null);
+  const queryClient = useQueryClient();
+
+  // Configure sensors for both pointer (mouse) and touch input
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      // Require a small movement before starting drag
+      // This allows clicks to work normally
+      distance: 8,
+    },
+  });
+
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      // Delay before touch drag starts (allows scrolling)
+      delay: 200,
+      tolerance: 5,
+    },
+  });
+
+  const sensors = useSensors(pointerSensor, touchSensor);
 
   // Fetch plan data
   const {
@@ -48,6 +82,9 @@ export function WeekGrid({
     isLoading: isPlanLoading,
     error: planError,
   } = usePlan(currentWeek);
+
+  // Mutation for updating meal assignments
+  const setMealMutation = useSetMeal();
 
   // Fetch user preferences to get meal types
   const { data: preferences } = usePreferences();
@@ -98,6 +135,123 @@ export function WeekGrid({
     return map;
   }, [plan?.items]);
 
+  // Drag event handlers
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event;
+    if (active.data.current?.type === 'recipe') {
+      setActiveDragData(active.data.current as DragData);
+    }
+  }, []);
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+
+      // Clear the drag overlay
+      setActiveDragData(null);
+
+      // If no drop target, cancel the operation
+      if (!over) {
+        return;
+      }
+
+      const dragData = active.data.current as DragData;
+      const dropData = over.data.current as DropData;
+
+      // Validate we have proper data
+      if (dragData?.type !== 'recipe' || dropData?.type !== 'meal-slot') {
+        return;
+      }
+
+      const { recipeId, sourceDay, sourceMealType } = dragData;
+      const { day: targetDay, mealType: targetMealType } = dropData;
+
+      // If dropping on the same slot, do nothing
+      if (sourceDay === targetDay && sourceMealType === targetMealType) {
+        return;
+      }
+
+      // Optimistic update: modify the cache immediately
+      const previousPlan = queryClient.getQueryData<WeeklyPlanWithItems>(
+        queryKeys.plans.detail(currentWeek)
+      );
+
+      if (previousPlan?.items) {
+        // Create optimistic update
+        const updatedItems = previousPlan.items.map((item) => {
+          // Clear the source slot
+          if (item.dayOfWeek === sourceDay && item.mealType === sourceMealType) {
+            return { ...item, recipeId: null };
+          }
+          // Set the target slot
+          if (item.dayOfWeek === targetDay && item.mealType === targetMealType) {
+            return { ...item, recipeId };
+          }
+          return item;
+        });
+
+        // Check if target slot exists, if not add it
+        const targetExists = updatedItems.some(
+          (item) => item.dayOfWeek === targetDay && item.mealType === targetMealType
+        );
+        if (!targetExists) {
+          updatedItems.push({
+            id: `temp-${Date.now()}`,
+            planId: previousPlan.id,
+            recipeId,
+            dayOfWeek: targetDay,
+            mealType: targetMealType,
+            servings: 2,
+            notes: null,
+            slotType: 'recipe',
+            wasMade: false,
+          });
+        }
+
+        queryClient.setQueryData<WeeklyPlanWithItems>(
+          queryKeys.plans.detail(currentWeek),
+          { ...previousPlan, items: updatedItems }
+        );
+      }
+
+      try {
+        // Clear the source slot
+        await setMealMutation.mutateAsync({
+          week: currentWeek,
+          day: sourceDay,
+          mealType: sourceMealType,
+          input: { recipeId: null },
+        });
+
+        // Set the target slot
+        await setMealMutation.mutateAsync({
+          week: currentWeek,
+          day: targetDay,
+          mealType: targetMealType,
+          input: { recipeId },
+        });
+
+        // Success - meal moved
+        console.log(`Meal moved to ${targetMealType}`);
+      } catch (error) {
+        // Rollback on error
+        if (previousPlan) {
+          queryClient.setQueryData<WeeklyPlanWithItems>(
+            queryKeys.plans.detail(currentWeek),
+            previousPlan
+          );
+        }
+
+        console.error('Failed to move meal:', error);
+      }
+    },
+    [currentWeek, queryClient, setMealMutation]
+  );
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragData(null);
+  }, []);
+
   // Navigation handlers
   const handlePreviousWeek = () => {
     const prevWeek = getPreviousWeek(currentWeek);
@@ -131,9 +285,15 @@ export function WeekGrid({
   const isThisWeek = isCurrentWeek(currentWeek);
 
   return (
-    <div className="space-y-4">
-      {/* Week Navigation Header */}
-      <div className="flex items-center justify-between">
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="space-y-4">
+        {/* Week Navigation Header */}
+        <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -310,6 +470,20 @@ export function WeekGrid({
           </div>
         </>
       )}
+
+      {/* Drag Overlay - shows the dragged item */}
+      <DragOverlay>
+        {activeDragData?.recipe ? (
+          <div className="opacity-90 shadow-xl">
+            <RecipeCard
+              recipe={activeDragData.recipe}
+              dragDisabled
+              className="ring-2 ring-primary"
+            />
+          </div>
+        ) : null}
+      </DragOverlay>
     </div>
+    </DndContext>
   );
 }

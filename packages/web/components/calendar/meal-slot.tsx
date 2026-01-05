@@ -1,13 +1,24 @@
 'use client';
 
+import { useDroppable } from '@dnd-kit/core';
 import { Plus, Utensils, SkipForward, UtensilsCrossed } from 'lucide-react';
-import { PlanItem, MealType, RecipeWithRelations, SlotType } from '@/types/api';
+import { PlanItem, MealType, RecipeWithRelations, SlotType, DayOfWeek } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { RecipeCard } from './recipe-card';
 import { cn } from '@/lib/utils';
 
+/**
+ * Data attached to droppable meal slots
+ */
+export interface DropData {
+  type: 'meal-slot';
+  day: DayOfWeek;
+  mealType: MealType;
+  hasRecipe: boolean;
+}
+
 interface MealSlotProps {
-  day: number; // 1-7 (Mon-Sun)
+  day: DayOfWeek; // 1-7 (Mon-Sun)
   mealType: MealType;
   planItem?: PlanItem;
   recipe?: RecipeWithRelations;
@@ -19,6 +30,7 @@ interface MealSlotProps {
 /**
  * Represents one cell in the calendar grid
  * Shows either an empty "+" button or a recipe card
+ * Supports drop targets for drag-and-drop meal assignment
  */
 export function MealSlot({
   day,
@@ -29,12 +41,36 @@ export function MealSlot({
   onSlotClick,
   className,
 }: MealSlotProps) {
+  // Create a unique droppable ID
+  const droppableId = `slot-${day}-${mealType}`;
+
+  const { setNodeRef, isOver, active } = useDroppable({
+    id: droppableId,
+    data: {
+      type: 'meal-slot',
+      day,
+      mealType,
+      hasRecipe: !!recipe,
+    } as DropData,
+  });
+
+  // Determine if this slot is a valid drop target
+  // It's valid if something is being dragged and it's not the same slot
+  const isValidDropTarget = active && (
+    !active.data.current ||
+    active.data.current.sourceDay !== day ||
+    active.data.current.sourceMealType !== mealType
+  );
+
   // Handle non-recipe slot types
   if (planItem && planItem.slotType !== 'recipe') {
     return (
       <div
+        ref={setNodeRef}
         className={cn(
-          'flex min-h-[80px] items-center justify-center rounded-md border border-dashed bg-muted/30 p-2',
+          'flex min-h-[80px] items-center justify-center rounded-md border border-dashed bg-muted/30 p-2 transition-colors',
+          isOver && isValidDropTarget && 'border-primary bg-primary/10 border-solid border-2',
+          active && isValidDropTarget && !isOver && 'border-primary/50',
           className
         )}
       >
@@ -54,8 +90,11 @@ export function MealSlot({
   if (!planItem || !recipe) {
     return (
       <div
+        ref={setNodeRef}
         className={cn(
-          'flex min-h-[80px] items-center justify-center rounded-md border border-dashed bg-muted/20 p-2',
+          'flex min-h-[80px] items-center justify-center rounded-md border border-dashed bg-muted/20 p-2 transition-colors',
+          isOver && isValidDropTarget && 'border-primary bg-primary/10 border-solid border-2',
+          active && isValidDropTarget && !isOver && 'border-primary/50',
           className
         )}
       >
@@ -74,8 +113,21 @@ export function MealSlot({
 
   // Filled slot - show recipe card
   return (
-    <div className={cn('min-h-[80px] p-1', className)}>
-      <RecipeCard recipe={recipe} onClick={onSlotClick} />
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'min-h-[80px] p-1 rounded-md transition-colors',
+        isOver && isValidDropTarget && 'bg-primary/10 ring-2 ring-primary ring-inset',
+        active && isValidDropTarget && !isOver && 'ring-1 ring-primary/50 ring-inset',
+        className
+      )}
+    >
+      <RecipeCard
+        recipe={recipe}
+        onClick={onSlotClick}
+        day={day}
+        mealType={mealType}
+      />
     </div>
   );
 }

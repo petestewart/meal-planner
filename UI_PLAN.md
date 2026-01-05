@@ -296,8 +296,8 @@ packages/web/
 
 ### Ticket: U007 Implement drag-and-drop meal assignment
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U007
 - **Scope:** Add drag-and-drop support for moving recipes between meal slots
 - **Acceptance Criteria:**
   - Drag recipe card from one slot to another
