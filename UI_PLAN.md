@@ -483,8 +483,8 @@ packages/web/
 
 ### Ticket: U017 Build settings/preferences page
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U017
 - **Scope:** Create settings page for user preferences
 - **Acceptance Criteria:**
   - Household size setting
@@ -500,7 +500,7 @@ packages/web/
   - Change household size, verify saved to API
   - Toggle dietary restriction, verify persisted
   - Settings survive page reload
-- **Notes:**
+- **Notes:** Implementation complete. Created settings page with all UI elements: household size (number input 1-12), default servings (number input 1-12), meal type checkboxes (breakfast/lunch/dinner/snacks), dietary restrictions checkboxes (8 options), disliked ingredients tag input, favorite cuisines checkboxes (10 options), max prep time (number input in minutes), prep day selector (dropdown), and dark mode toggle using next-themes. Created helper components: SettingsSection.tsx and TagInput.tsx. Uses existing usePreferences/useUpdatePreferences hooks with debounced auto-save. Build passes.
 
 ### Ticket: U018 Implement offline support with service worker
 - **Priority:** P1
