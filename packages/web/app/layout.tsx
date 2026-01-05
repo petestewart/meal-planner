@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { Header, Navigation, MobileNav } from "@/components/layout";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,7 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
+      <body className="min-h-screen bg-background font-sans antialiased">
         <QueryProvider>
           <ThemeProvider
             attribute="class"
@@ -23,7 +24,14 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <Header />
+            <div className="flex">
+              <Navigation />
+              <main className="flex-1 pb-16 md:pb-0">
+                {children}
+              </main>
+            </div>
+            <MobileNav />
           </ThemeProvider>
         </QueryProvider>
       </body>
