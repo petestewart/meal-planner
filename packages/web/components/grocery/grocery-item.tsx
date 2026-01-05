@@ -69,7 +69,7 @@ export function GroceryItem({ item, week, className }: GroceryItemProps) {
 
   // Get recipe titles for this item
   const recipeNames = React.useMemo(() => {
-    if (!recipesData?.recipes || item.recipeIds.length === 0) return [];
+    if (!recipesData?.recipes || !item.recipeIds || item.recipeIds.length === 0) return [];
     return item.recipeIds
       .map((id) => recipesData.recipes.find((r) => r.id === id)?.title)
       .filter(Boolean) as string[];

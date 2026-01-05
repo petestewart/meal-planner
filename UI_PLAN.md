@@ -661,6 +661,6 @@ packages/web/
 
 > _New issues must be appended here with a timestamp and brief context._
 
-<!-- Example:
-- **2026-01-04 14:30** - Issue description and context
--->
+- **2026-01-05 QA** - CORS configuration in API server (packages/api/src/server.ts) was missing port 3001 for Next.js dev server. Fixed by adding `http://localhost:3001` and `http://127.0.0.1:3001` to allowed origins.
+- **2026-01-05 QA** - Runtime error in grocery-item.tsx (line 72): "Cannot read properties of undefined (reading 'length')" when `item.recipeIds` is undefined. Fixed by adding null check before accessing `.length`.
+- **2026-01-05 QA** - HTML entities not decoded in recipe titles (e.g., `World&#39;s Best` instead of `World's Best`). Needs investigation - likely an issue with how recipe data is stored or displayed.
