@@ -11,7 +11,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePlan, usePreferences, useSetMeal, queryKeys } from '@/lib/queries';
 import { useRecipes } from '@/lib/queries';
@@ -33,6 +33,9 @@ import {
 } from '@/lib/week-utils';
 import { MealType, DayOfWeek, PlanItem, RecipeWithRelations, WeeklyPlanWithItems } from '@/types/api';
 import { cn } from '@/lib/utils';
+import { CalendarGridSkeleton, CalendarMobileSkeletonProps } from '@/components/skeletons';
+import { EmptyState } from '@/components/ui/empty-state';
+import { InlineError } from '@/components/ui/error-boundary';
 
 interface WeekGridProps {
   initialWeek?: string;
@@ -334,18 +337,26 @@ export function WeekGrid({
         </Button>
       </div>
 
-      {/* Loading State */}
+      {/* Loading State - Skeleton */}
       {isPlanLoading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <>
+          {/* Desktop skeleton */}
+          <div className="hidden md:block">
+            <CalendarGridSkeleton mealTypesCount={mealTypes.length} />
+          </div>
+          {/* Mobile skeleton */}
+          <div className="md:hidden">
+            <CalendarMobileSkeletonProps mealTypesCount={mealTypes.length} />
+          </div>
+        </>
       )}
 
       {/* Error State */}
       {planError && (
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-center text-destructive">
-          Failed to load meal plan. Please try again.
-        </div>
+        <InlineError
+          message="Failed to load meal plan. Please try again."
+          onRetry={() => window.location.reload()}
+        />
       )}
 
       {/* Calendar Grid */}

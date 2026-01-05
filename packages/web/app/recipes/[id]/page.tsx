@@ -14,6 +14,7 @@ import {
   AddToPlanButton,
 } from '@/components/recipes';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * Get an emoji for a cuisine type
@@ -81,42 +82,42 @@ function getDietaryBadges(recipe: { tagIds?: string[]; description?: string | nu
  */
 function RecipeDetailSkeleton() {
   return (
-    <div className="container mx-auto max-w-4xl p-6 animate-pulse">
+    <div className="container mx-auto max-w-4xl p-6">
       {/* Back button skeleton */}
-      <div className="h-9 w-24 bg-muted rounded mb-6" />
+      <Skeleton className="h-9 w-24 mb-6" />
 
       {/* Hero skeleton */}
-      <div className="relative mb-6 aspect-[21/9] w-full overflow-hidden rounded-xl bg-muted" />
+      <Skeleton className="mb-6 aspect-[21/9] w-full rounded-xl" />
 
       {/* Title skeleton */}
-      <div className="h-8 w-3/4 bg-muted rounded mb-4" />
+      <Skeleton className="h-8 w-3/4 mb-4" />
 
       {/* Metadata skeleton */}
       <div className="flex gap-4 mb-6">
-        <div className="h-5 w-24 bg-muted rounded" />
-        <div className="h-5 w-24 bg-muted rounded" />
-        <div className="h-5 w-24 bg-muted rounded" />
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="h-5 w-24" />
       </div>
 
       {/* Controls skeleton */}
       <div className="flex gap-4 mb-8">
-        <div className="h-9 w-32 bg-muted rounded" />
-        <div className="h-9 w-32 bg-muted rounded" />
+        <Skeleton className="h-9 w-32" />
+        <Skeleton className="h-9 w-32" />
       </div>
 
       {/* Ingredients skeleton */}
-      <div className="h-6 w-32 bg-muted rounded mb-4" />
+      <Skeleton className="h-6 w-32 mb-4" />
       <div className="space-y-3">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-5 w-full bg-muted rounded" />
+          <Skeleton key={i} className="h-5 w-full" />
         ))}
       </div>
 
       {/* Instructions skeleton */}
-      <div className="h-6 w-32 bg-muted rounded mt-8 mb-4" />
+      <Skeleton className="h-6 w-32 mt-8 mb-4" />
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 w-full bg-muted rounded" />
+          <Skeleton key={i} className="h-16 w-full" />
         ))}
       </div>
     </div>

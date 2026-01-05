@@ -22,6 +22,8 @@ import { GroceryItem } from './grocery-item';
 import { ShoppingModeView } from './shopping-mode';
 import { CheckPantryDialog } from './check-pantry-dialog';
 import { cn } from '@/lib/utils';
+import { GroceryListSkeleton } from '@/components/skeletons';
+import { InlineError } from '@/components/ui/error-boundary';
 
 interface GroceryListViewProps {
   initialWeek?: string;
@@ -232,24 +234,15 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
         </div>
       )}
 
-      {/* Loading state */}
-      {isLoading && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="mt-4 text-muted-foreground">Loading grocery list...</p>
-        </div>
-      )}
+      {/* Loading state - Skeleton */}
+      {isLoading && <GroceryListSkeleton categoryCount={3} />}
 
       {/* Error state */}
       {isError && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <p className="text-destructive">
-            {error?.message || 'Failed to load grocery list'}
-          </p>
-          <Button variant="outline" className="mt-4" onClick={handleGenerate}>
-            Try generating a new list
-          </Button>
-        </div>
+        <InlineError
+          message={error?.message || 'Failed to load grocery list'}
+          onRetry={handleGenerate}
+        />
       )}
 
       {/* Empty state */}

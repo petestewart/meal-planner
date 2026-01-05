@@ -10,6 +10,8 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { PantryListSkeleton } from '@/components/skeletons';
+import { InlineError } from '@/components/ui/error-boundary';
 import {
   usePantryItems,
   useExpiringItems,
@@ -262,21 +264,15 @@ export function PantryListView({ className }: PantryListViewProps) {
         </Collapsible>
       )}
 
-      {/* Loading state */}
-      {isLoading && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="mt-4 text-muted-foreground">Loading pantry...</p>
-        </div>
-      )}
+      {/* Loading state - Skeleton */}
+      {isLoading && <PantryListSkeleton categoryCount={4} />}
 
       {/* Error state */}
       {isError && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <p className="text-destructive">
-            {error?.message || 'Failed to load pantry items'}
-          </p>
-        </div>
+        <InlineError
+          message={error?.message || 'Failed to load pantry items'}
+          onRetry={() => window.location.reload()}
+        />
       )}
 
       {/* Empty state */}

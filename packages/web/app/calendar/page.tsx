@@ -7,7 +7,7 @@ import { RecipeSelector, RecipeSelection } from '@/components/calendar/recipe-se
 import { getCurrentWeek } from '@/lib/week-utils';
 import { DayOfWeek, MealType, PlanItem } from '@/types/api';
 import { useSetMeal, usePreferences, useCreatePlan } from '@/lib/queries';
-import { Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface SelectedSlot {
   day: DayOfWeek;
@@ -132,23 +132,58 @@ function CalendarContent() {
   );
 }
 
+function CalendarSkeleton() {
+  return (
+    <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Meal Calendar</h1>
+        <p className="mt-2 text-muted-foreground">
+          Plan your meals for the week ahead.
+        </p>
+      </div>
+
+      {/* Week navigation skeleton */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-9" />
+          <Skeleton className="h-9 w-9" />
+        </div>
+        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-9 w-16" />
+      </div>
+
+      {/* Calendar grid skeleton */}
+      <div className="space-y-4">
+        {/* Day headers */}
+        <div className="grid grid-cols-[80px_repeat(7,1fr)] gap-1">
+          <div />
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="text-center py-2">
+              <Skeleton className="h-5 w-12 mx-auto mb-1" />
+              <Skeleton className="h-4 w-8 mx-auto" />
+            </div>
+          ))}
+        </div>
+
+        {/* Meal rows */}
+        {[1, 2].map((row) => (
+          <div key={row} className="grid grid-cols-[80px_repeat(7,1fr)] gap-1">
+            <div className="flex items-center justify-end pr-2">
+              <Skeleton className="h-4 w-14" />
+            </div>
+            {Array.from({ length: 7 }).map((_, i) => (
+              <Skeleton key={i} className="min-h-[80px] rounded-md" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function CalendarPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="container mx-auto p-6">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold">Meal Calendar</h1>
-            <p className="mt-2 text-muted-foreground">
-              Plan your meals for the week ahead.
-            </p>
-          </div>
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<CalendarSkeleton />}>
       <CalendarContent />
     </Suspense>
   );

@@ -595,8 +595,8 @@ packages/web/
 
 ### Ticket: U023 Add loading states and skeletons
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U023
 - **Scope:** Implement consistent loading states across all views
 - **Acceptance Criteria:**
   - Skeleton loaders for recipe cards, calendar slots
