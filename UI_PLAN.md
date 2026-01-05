@@ -523,8 +523,8 @@ packages/web/
 
 ### Ticket: U019 Implement meal slot special states
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U019
 - **Scope:** Support "Dining Out", "Skip", and "Leftovers" meal slot states
 - **Acceptance Criteria:**
   - Recipe selector includes "Dining Out" and "Skip" options

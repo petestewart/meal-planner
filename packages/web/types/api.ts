@@ -316,6 +316,8 @@ export interface SetMealInput {
   recipeId: string | null;
   servings?: number;
   notes?: string;
+  slotType?: SlotType;
+  leftoversSourceId?: string | null;
 }
 
 /**

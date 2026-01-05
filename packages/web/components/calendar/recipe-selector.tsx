@@ -58,6 +58,8 @@ export interface RecipeSelection {
   recipeId: string | null;
   servings: number;
   slotType: SlotType;
+  notes?: string;
+  leftoversSourceId?: string | null;
 }
 
 interface SpecialOption {
@@ -89,6 +91,7 @@ export function RecipeSelector({
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeWithRelations | null>(null);
   const [selectedSlotType, setSelectedSlotType] = useState<SlotType | null>(null);
   const [servings, setServings] = useState(defaultServings);
+  const [diningOutNotes, setDiningOutNotes] = useState('');
 
   // Fetch all recipes
   const { data: recipesData, isLoading: isLoadingRecipes } = useRecipes(
@@ -129,6 +132,10 @@ export function RecipeSelector({
   const handleSpecialOptionClick = useCallback((slotType: SlotType) => {
     setSelectedSlotType(slotType);
     setSelectedRecipe(null);
+    // Clear notes when switching away from dining out
+    if (slotType !== 'dining_out') {
+      setDiningOutNotes('');
+    }
   }, []);
 
   // Handle confirm
@@ -144,6 +151,7 @@ export function RecipeSelector({
         recipeId: null,
         servings: defaultServings,
         slotType: selectedSlotType,
+        notes: selectedSlotType === 'dining_out' ? diningOutNotes : undefined,
       });
     }
     // Reset state after selection
@@ -151,7 +159,8 @@ export function RecipeSelector({
     setSelectedRecipe(null);
     setSelectedSlotType(null);
     setServings(defaultServings);
-  }, [selectedRecipe, selectedSlotType, servings, defaultServings, onSelect]);
+    setDiningOutNotes('');
+  }, [selectedRecipe, selectedSlotType, servings, defaultServings, onSelect, diningOutNotes]);
 
   // Handle cancel
   const handleCancel = useCallback(() => {
@@ -159,6 +168,7 @@ export function RecipeSelector({
     setSelectedRecipe(null);
     setSelectedSlotType(null);
     setServings(defaultServings);
+    setDiningOutNotes('');
     onOpenChange(false);
   }, [defaultServings, onOpenChange]);
 
@@ -169,6 +179,7 @@ export function RecipeSelector({
       setSelectedRecipe(null);
       setSelectedSlotType(null);
       setServings(defaultServings);
+      setDiningOutNotes('');
     }
     onOpenChange(newOpen);
   }, [defaultServings, onOpenChange]);
@@ -223,6 +234,22 @@ export function RecipeSelector({
             </Button>
           ))}
         </div>
+
+        {/* Dining Out Notes */}
+        {selectedSlotType === 'dining_out' && (
+          <div className="space-y-2">
+            <label htmlFor="dining-out-notes" className="text-sm font-medium">
+              Restaurant / Notes (optional)
+            </label>
+            <Input
+              id="dining-out-notes"
+              placeholder="Enter restaurant name..."
+              value={diningOutNotes}
+              onChange={(e) => setDiningOutNotes(e.target.value)}
+              aria-label="Restaurant or dining out notes"
+            />
+          </div>
+        )}
 
         {/* Recipe List */}
         <ScrollArea className="flex-1 min-h-0 border rounded-md">

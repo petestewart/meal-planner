@@ -66,16 +66,21 @@ function CalendarContent() {
     async (selection: RecipeSelection) => {
       if (!selectedSlot) return;
 
+      const input = {
+        recipeId: selection.recipeId,
+        servings: selection.servings,
+        slotType: selection.slotType,
+        notes: selection.notes,
+        leftoversSourceId: selection.leftoversSourceId,
+      };
+
       try {
         // Try to set the meal - if plan doesn't exist, create it first
         await setMealMutation.mutateAsync({
           week,
           day: selectedSlot.day,
           mealType: selectedSlot.mealType,
-          input: {
-            recipeId: selection.recipeId,
-            servings: selection.servings,
-          },
+          input,
         });
       } catch (error: unknown) {
         // If the plan doesn't exist (404), create it first then retry
@@ -85,10 +90,7 @@ function CalendarContent() {
             week,
             day: selectedSlot.day,
             mealType: selectedSlot.mealType,
-            input: {
-              recipeId: selection.recipeId,
-              servings: selection.servings,
-            },
+            input,
           });
         } else {
           console.error('Failed to set meal:', error);
