@@ -198,12 +198,13 @@ export function RecipeSelector({
 
         {/* Search Bar */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder="Search recipes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
+            aria-label="Search recipes"
           />
         </div>
 
@@ -297,10 +298,11 @@ export function RecipeSelector({
                   className="h-8 w-8"
                   onClick={decrementServings}
                   disabled={servings <= 1}
+                  aria-label="Decrease servings"
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
-                <span className="w-8 text-center font-medium">{servings}</span>
+                <span className="w-8 text-center font-medium" aria-live="polite">{servings}</span>
                 <Button
                   type="button"
                   variant="outline"
@@ -308,6 +310,7 @@ export function RecipeSelector({
                   className="h-8 w-8"
                   onClick={incrementServings}
                   disabled={servings >= 20}
+                  aria-label="Increase servings"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>

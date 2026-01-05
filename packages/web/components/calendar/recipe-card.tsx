@@ -72,6 +72,7 @@ export function RecipeCard({
       style={style}
       {...attributes}
       {...listeners}
+      aria-label={`${recipe.title} - click to edit or drag to move`}
       className={cn(
         'w-full text-left rounded-md border bg-card p-2 transition-colors touch-manipulation',
         'hover:bg-accent hover:text-accent-foreground',

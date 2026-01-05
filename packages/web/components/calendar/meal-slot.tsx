@@ -77,7 +77,8 @@ export function MealSlot({
         <button
           type="button"
           onClick={onSlotClick}
-          className="flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+          className="flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-md p-2"
+          aria-label={`${formatSlotType(planItem.slotType)} - click to edit`}
         >
           <SlotTypeIcon slotType={planItem.slotType} />
           <span className="text-xs capitalize">{formatSlotType(planItem.slotType)}</span>

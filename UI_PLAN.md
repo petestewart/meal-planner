@@ -630,8 +630,8 @@ packages/web/
 
 ### Ticket: U025 Add keyboard navigation and accessibility
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U025
 - **Scope:** Ensure WCAG 2.1 AA compliance and keyboard navigation
 - **Acceptance Criteria:**
   - All interactive elements focusable via Tab

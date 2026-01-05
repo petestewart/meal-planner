@@ -72,13 +72,14 @@ export function RecipeFilters({
     <div className={cn('space-y-3', className)}>
       {/* Search bar */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         <Input
           type="text"
           placeholder="Search recipes..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           className="pl-10"
+          aria-label="Search recipes"
         />
       </div>
 
@@ -89,9 +90,10 @@ export function RecipeFilters({
           <select
             value={filters.cuisine}
             onChange={handleCuisineChange}
+            aria-label="Filter by cuisine"
             className={cn(
               'h-9 appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm',
-              'focus:outline-none focus:ring-1 focus:ring-ring',
+              'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
               'cursor-pointer'
             )}
           >
@@ -102,7 +104,7 @@ export function RecipeFilters({
               </option>
             ))}
           </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         </div>
 
         {/* Sort dropdown */}
@@ -110,9 +112,10 @@ export function RecipeFilters({
           <select
             value={filters.sort}
             onChange={handleSortChange}
+            aria-label="Sort recipes"
             className={cn(
               'h-9 appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm',
-              'focus:outline-none focus:ring-1 focus:ring-ring',
+              'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
               'cursor-pointer'
             )}
           >
@@ -120,7 +123,7 @@ export function RecipeFilters({
             <option value="date">Sort: Date Added</option>
             <option value="prepTime">Sort: Prep Time</option>
           </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         </div>
 
         {/* Favorites toggle */}
@@ -129,12 +132,14 @@ export function RecipeFilters({
           size="sm"
           onClick={handleFavoritesToggle}
           className="gap-1"
+          aria-pressed={filters.favorites}
         >
           <Heart
             className={cn(
               'h-4 w-4',
               filters.favorites && 'fill-current'
             )}
+            aria-hidden="true"
           />
           Favorites
         </Button>

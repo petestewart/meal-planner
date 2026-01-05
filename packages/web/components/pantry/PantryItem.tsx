@@ -181,7 +181,7 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
             className="h-10 w-10 sm:h-9 sm:w-9 touch-manipulation"
             onClick={handleUse}
             disabled={isPending}
-            title="Use 1"
+            aria-label={`Use one ${item.ingredientName}`}
           >
             <Minus className="h-4 w-4" />
           </Button>
@@ -192,7 +192,7 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
           className="h-10 w-10 sm:h-9 sm:w-9 touch-manipulation"
           onClick={() => onEdit(item)}
           disabled={isPending}
-          title="Edit"
+          aria-label={`Edit ${item.ingredientName}`}
         >
           <Pencil className="h-4 w-4" />
         </Button>
@@ -202,7 +202,7 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
           className="h-10 w-10 sm:h-9 sm:w-9 text-destructive hover:text-destructive touch-manipulation"
           onClick={handleRemove}
           disabled={isPending}
-          title="Remove"
+          aria-label={`Remove ${item.ingredientName}`}
         >
           <Trash2 className="h-4 w-4" />
         </Button>
