@@ -174,8 +174,8 @@ packages/web/
 
 ### Ticket: U001 Initialize Next.js project in monorepo
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U001
 - **Scope:** Create packages/web with Next.js 14, configure pnpm workspace integration
 - **Acceptance Criteria:**
   - Next.js 14 with App Router initialized in packages/web
@@ -190,8 +190,8 @@ packages/web/
 
 ### Ticket: U002 Configure Tailwind CSS and shadcn/ui
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U002
 - **Scope:** Set up Tailwind CSS, install and configure shadcn/ui component library
 - **Acceptance Criteria:**
   - Tailwind CSS configured with custom theme
@@ -218,8 +218,8 @@ packages/web/
 
 ### Ticket: U003 Create API client and TanStack Query setup
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U003
 - **Scope:** Create typed API client wrapper, configure TanStack Query provider
 - **Acceptance Criteria:**
   - API client with typed methods for all backend endpoints
@@ -235,8 +235,8 @@ packages/web/
 
 ### Ticket: U004 Implement app layout and navigation
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U004
 - **Scope:** Create responsive layout with header, navigation, and mobile bottom nav
 - **Acceptance Criteria:**
   - Header with app title and settings access
@@ -253,8 +253,8 @@ packages/web/
 
 ### Ticket: U005 Build dashboard/home page
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U005
 - **Scope:** Create dashboard with week overview, quick actions, and alerts
 - **Acceptance Criteria:**
   - Mini calendar showing current week's meals
@@ -267,11 +267,18 @@ packages/web/
   - Quick actions navigate to correct pages
   - Expiring items show when pantry has items expiring within 7 days
 - **Notes:**
+  - Implemented "This Week at a Glance" mini calendar with current week meals
+  - Quick action buttons styled as Button components: Plan Week, Add Recipe, Grocery List
+  - Today and tomorrow highlighted with badges and accent styling
+  - Expiring pantry items section ready (placeholder until pantry API exists)
+  - Recently Added recipes section shows latest 4 recipes with cook times
+  - Uses usePlan, useRecipes, usePreferences hooks for data
+  - Kept navigation cards at bottom for full page access
 
 ### Ticket: U006 Build weekly calendar view
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U006
 - **Scope:** Create interactive 7-day meal calendar grid with recipe slots
 - **Acceptance Criteria:**
   - 7-day grid view (Mon-Sun)
@@ -307,8 +314,8 @@ packages/web/
 
 ### Ticket: U008 Build recipe selector modal
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U008
 - **Scope:** Create modal for selecting a recipe to assign to a meal slot
 - **Acceptance Criteria:**
   - Opens when clicking empty slot or "change" on filled slot
@@ -326,8 +333,8 @@ packages/web/
 
 ### Ticket: U009 Build recipe library page
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U009
 - **Scope:** Create browsable recipe library with search, filters, and grid view
 - **Acceptance Criteria:**
   - Grid of recipe cards (image, title, time, cuisine)
@@ -344,8 +351,8 @@ packages/web/
 
 ### Ticket: U010 Build recipe detail page
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U010
 - **Scope:** Create recipe detail view with ingredients, instructions, and actions
 - **Acceptance Criteria:**
   - Hero image (or placeholder) with title overlay
@@ -403,8 +410,8 @@ packages/web/
 
 ### Ticket: U013 Build grocery list page
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U013
 - **Scope:** Create grocery list view with categorized items and state tracking
 - **Acceptance Criteria:**
   - Items grouped by store section (Produce, Dairy, etc.)
