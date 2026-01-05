@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, ShoppingCart, Check, ShoppingBag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, ShoppingCart, Check, ShoppingBag, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -9,8 +9,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { GroceryItem as GroceryItemType } from '@/types/api';
-import { useGroceryList, useGenerateGroceryList } from '@/lib/queries';
+import { GroceryItem as GroceryItemType, CheckPantryResponse } from '@/types/api';
+import { useGroceryList, useGenerateGroceryList, useCheckPantry } from '@/lib/queries';
 import {
   getCurrentWeek,
   getNextWeek,
@@ -20,6 +20,7 @@ import {
 import { GroceryCategoryGroup } from './grocery-category';
 import { GroceryItem } from './grocery-item';
 import { ShoppingModeView } from './shopping-mode';
+import { CheckPantryDialog } from './check-pantry-dialog';
 import { cn } from '@/lib/utils';
 
 interface GroceryListViewProps {
@@ -51,6 +52,8 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
   const [week, setWeek] = React.useState(initialWeek || getCurrentWeek());
   const [alreadyHaveOpen, setAlreadyHaveOpen] = React.useState(false);
   const [isShoppingMode, setIsShoppingMode] = React.useState(false);
+  const [checkPantryDialogOpen, setCheckPantryDialogOpen] = React.useState(false);
+  const [checkPantryResult, setCheckPantryResult] = React.useState<CheckPantryResponse | null>(null);
 
   const {
     data: groceryList,
@@ -60,6 +63,7 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
   } = useGroceryList(week);
 
   const generateList = useGenerateGroceryList();
+  const checkPantry = useCheckPantry();
 
   const handlePreviousWeek = () => setWeek(getPreviousWeek(week));
   const handleNextWeek = () => setWeek(getNextWeek(week));
@@ -70,6 +74,28 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
       week,
       excludePantry: true,
       groupBy: 'category',
+    });
+  };
+
+  const handleOpenCheckPantryDialog = () => {
+    setCheckPantryResult(null);
+    setCheckPantryDialogOpen(true);
+  };
+
+  const handleCheckPantryDialogClose = (open: boolean) => {
+    setCheckPantryDialogOpen(open);
+    if (!open) {
+      // Reset result when dialog is closed
+      setCheckPantryResult(null);
+      checkPantry.reset();
+    }
+  };
+
+  const handleCheckPantry = () => {
+    checkPantry.mutate(week, {
+      onSuccess: (result) => {
+        setCheckPantryResult(result);
+      },
     });
   };
 
@@ -120,6 +146,18 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Check Pantry button - only show when there are active items */}
+          {activeItems.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={handleOpenCheckPantryDialog}
+              className="gap-2"
+            >
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">Check Pantry</span>
+              <span className="sm:hidden">Pantry</span>
+            </Button>
+          )}
           {/* Shopping Mode button - only show when there are active items */}
           {activeItems.length > 0 && (
             <Button
@@ -296,6 +334,17 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
           )}
         </>
       )}
+
+      {/* Check Pantry Dialog */}
+      <CheckPantryDialog
+        open={checkPantryDialogOpen}
+        onOpenChange={handleCheckPantryDialogClose}
+        isPending={checkPantry.isPending}
+        isError={checkPantry.isError}
+        errorMessage={checkPantry.error?.message}
+        result={checkPantryResult}
+        onCheck={handleCheckPantry}
+      />
     </div>
   );
 }

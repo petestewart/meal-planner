@@ -466,8 +466,8 @@ packages/web/
 
 ### Ticket: U016 Implement pantry-grocery integration
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U016
 - **Scope:** Connect pantry to grocery list for auto-checking
 - **Acceptance Criteria:**
   - "Check Pantry" button on grocery list
