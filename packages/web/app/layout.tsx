@@ -1,12 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { Header, Navigation, MobileNav } from "@/components/layout";
+import { OfflineIndicator } from "@/components/ui/offline-indicator";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Meal Planner",
-  description: "Plan your weekly meals",
+  description: "Plan your weekly meals and manage grocery lists",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Meal Planner",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0ea5e9",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -31,6 +49,7 @@ export default function RootLayout({
             >
               Skip to main content
             </a>
+            <OfflineIndicator />
             <Header />
             <div className="flex">
               <Navigation />

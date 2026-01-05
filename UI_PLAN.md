@@ -504,8 +504,8 @@ packages/web/
 
 ### Ticket: U018 Implement offline support with service worker
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U018
 - **Scope:** Add PWA capabilities with offline grocery list support
 - **Acceptance Criteria:**
   - Service worker caches app shell
