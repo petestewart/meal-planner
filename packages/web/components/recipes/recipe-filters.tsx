@@ -1,0 +1,151 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { Search, Heart, ChevronDown } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+export type SortOption = 'name' | 'date' | 'prepTime';
+
+export interface FilterState {
+  search: string;
+  cuisine: string;
+  favorites: boolean;
+  sort: SortOption;
+}
+
+interface RecipeFiltersProps {
+  filters: FilterState;
+  onFiltersChange: (filters: FilterState) => void;
+  cuisines?: string[];
+  className?: string;
+}
+
+/**
+ * Recipe filter controls with search, cuisine filter, favorites toggle, and sort
+ */
+export function RecipeFilters({
+  filters,
+  onFiltersChange,
+  cuisines = [],
+  className,
+}: RecipeFiltersProps) {
+  // Local search state for debouncing
+  const [searchInput, setSearchInput] = useState(filters.search);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput !== filters.search) {
+        onFiltersChange({ ...filters, search: searchInput });
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchInput, filters, onFiltersChange]);
+
+  // Sync local state when external filters change
+  useEffect(() => {
+    setSearchInput(filters.search);
+  }, [filters.search]);
+
+  const handleCuisineChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      onFiltersChange({ ...filters, cuisine: e.target.value });
+    },
+    [filters, onFiltersChange]
+  );
+
+  const handleSortChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      onFiltersChange({ ...filters, sort: e.target.value as SortOption });
+    },
+    [filters, onFiltersChange]
+  );
+
+  const handleFavoritesToggle = useCallback(() => {
+    onFiltersChange({ ...filters, favorites: !filters.favorites });
+  }, [filters, onFiltersChange]);
+
+  return (
+    <div className={cn('space-y-3', className)}>
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search recipes..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {/* Filter row */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Cuisine filter */}
+        <div className="relative">
+          <select
+            value={filters.cuisine}
+            onChange={handleCuisineChange}
+            className={cn(
+              'h-9 appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm',
+              'focus:outline-none focus:ring-1 focus:ring-ring',
+              'cursor-pointer'
+            )}
+          >
+            <option value="">All Cuisines</option>
+            {cuisines.map((cuisine) => (
+              <option key={cuisine} value={cuisine}>
+                {cuisine.charAt(0).toUpperCase() + cuisine.slice(1)}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        </div>
+
+        {/* Sort dropdown */}
+        <div className="relative">
+          <select
+            value={filters.sort}
+            onChange={handleSortChange}
+            className={cn(
+              'h-9 appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm',
+              'focus:outline-none focus:ring-1 focus:ring-ring',
+              'cursor-pointer'
+            )}
+          >
+            <option value="name">Sort: Name</option>
+            <option value="date">Sort: Date Added</option>
+            <option value="prepTime">Sort: Prep Time</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        </div>
+
+        {/* Favorites toggle */}
+        <Button
+          variant={filters.favorites ? 'default' : 'outline'}
+          size="sm"
+          onClick={handleFavoritesToggle}
+          className="gap-1"
+        >
+          <Heart
+            className={cn(
+              'h-4 w-4',
+              filters.favorites && 'fill-current'
+            )}
+          />
+          Favorites
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export const defaultFilters: FilterState = {
+  search: '',
+  cuisine: '',
+  favorites: false,
+  sort: 'name',
+};
