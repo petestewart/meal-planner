@@ -371,8 +371,8 @@ packages/web/
 
 ### Ticket: U011 Build recipe import flow
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U011
 - **Scope:** Create UI for importing recipes from URLs
 - **Acceptance Criteria:**
   - URL input field with paste support

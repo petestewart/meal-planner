@@ -15,3 +15,8 @@ export { IngredientList } from './ingredient-list';
 export { InstructionSteps } from './instruction-steps';
 export { ServingScaler } from './serving-scaler';
 export { RecipeActions, AddToPlanButton } from './recipe-actions';
+
+// Recipe import components
+export { RecipeImportForm } from './recipe-import-form';
+export { RecipePreview } from './recipe-preview';
+export type { RecipePreviewUpdates } from './recipe-preview';
