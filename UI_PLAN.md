@@ -447,8 +447,8 @@ packages/web/
 
 ### Ticket: U015 Build pantry management page
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U015
 - **Scope:** Create pantry inventory management interface
 - **Acceptance Criteria:**
   - List of pantry items with quantity, unit, location

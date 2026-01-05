@@ -527,3 +527,84 @@ export interface UpdatePreferencesInput {
   prepDay?: PrepDay | null;
   cuisinePreferences?: Partial<CuisinePreferences>;
 }
+
+// ==================== Pantry Types ====================
+
+/**
+ * Valid storage locations for pantry items
+ */
+export type PantryLocation = 'fridge' | 'freezer' | 'pantry';
+
+/**
+ * Pantry item entity
+ */
+export interface PantryItem {
+  id: string;
+  ingredientId: string;
+  quantity: number | null;
+  unit: string | null;
+  expiresAt: string | null; // ISO date string YYYY-MM-DD
+  updatedAt: string; // ISO datetime string
+  isPrepared: boolean;
+  preparationNotes: string | null;
+  location: PantryLocation | null;
+  isStaple: boolean;
+}
+
+/**
+ * Pantry item with ingredient details for display
+ */
+export interface PantryItemWithIngredient extends PantryItem {
+  ingredientName: string;
+  ingredientCategory: string | null;
+}
+
+/**
+ * Input for adding a pantry item
+ */
+export interface AddPantryItemInput {
+  ingredientName: string;
+  quantity?: number | null;
+  unit?: string | null;
+  location?: PantryLocation | null;
+  expiresAt?: string | null;
+  isPrepared?: boolean;
+  preparationNotes?: string | null;
+  isStaple?: boolean;
+}
+
+/**
+ * Input for updating a pantry item
+ */
+export interface UpdatePantryItemInput {
+  quantity?: number | null;
+  unit?: string | null;
+  location?: PantryLocation | null;
+  expiresAt?: string | null;
+  isPrepared?: boolean;
+  preparationNotes?: string | null;
+  isStaple?: boolean;
+}
+
+/**
+ * Response for adding a pantry item
+ */
+export interface AddPantryItemResponse {
+  item: PantryItemWithIngredient;
+  created: boolean;
+}
+
+/**
+ * Response for listing pantry items
+ */
+export interface PantryListResponse {
+  items: PantryItemWithIngredient[];
+}
+
+/**
+ * Options for listing pantry items
+ */
+export interface ListPantryOptions {
+  location?: PantryLocation;
+  [key: string]: string | number | boolean | undefined;
+}

@@ -20,6 +20,7 @@ import {
   planApi,
   groceryApi,
   preferencesApi,
+  pantryApi,
   ApiClientError,
 } from './api';
 
@@ -50,6 +51,12 @@ import type {
   UserPreferences,
   UpdatePreferencesInput,
   MealType,
+  PantryListResponse,
+  PantryItemWithIngredient,
+  AddPantryItemInput,
+  AddPantryItemResponse,
+  UpdatePantryItemInput,
+  ListPantryOptions,
 } from '@/types/api';
 
 // ==================== Query Keys ====================
@@ -93,6 +100,16 @@ export const queryKeys = {
   // Preferences keys
   preferences: {
     all: ['preferences'] as const,
+  },
+
+  // Pantry keys
+  pantry: {
+    all: ['pantry'] as const,
+    lists: () => [...queryKeys.pantry.all, 'list'] as const,
+    list: (options: ListPantryOptions) =>
+      [...queryKeys.pantry.lists(), options] as const,
+    expiring: () => [...queryKeys.pantry.all, 'expiring'] as const,
+    staples: () => [...queryKeys.pantry.all, 'staples'] as const,
   },
 } as const;
 
@@ -662,6 +679,161 @@ export function useUpdatePreferences(
     onSuccess: (data) => {
       // Update preferences in the cache
       queryClient.setQueryData(queryKeys.preferences.all, data);
+    },
+    ...mutationOptions,
+  });
+}
+
+// ==================== Pantry Hooks ====================
+
+/**
+ * Hook to fetch pantry items
+ */
+export function usePantryItems(
+  options: ListPantryOptions = {},
+  queryOptions?: Omit<
+    UseQueryOptions<PantryListResponse, ApiClientError>,
+    'queryKey' | 'queryFn'
+  >
+) {
+  return useQuery({
+    queryKey: queryKeys.pantry.list(options),
+    queryFn: () => pantryApi.list(options),
+    ...queryOptions,
+  });
+}
+
+/**
+ * Hook to fetch expiring pantry items (within 7 days)
+ */
+export function useExpiringItems(
+  queryOptions?: Omit<
+    UseQueryOptions<PantryListResponse, ApiClientError>,
+    'queryKey' | 'queryFn'
+  >
+) {
+  return useQuery({
+    queryKey: queryKeys.pantry.expiring(),
+    queryFn: () => pantryApi.listExpiring(),
+    ...queryOptions,
+  });
+}
+
+/**
+ * Hook to fetch pantry staples
+ */
+export function usePantryStaples(
+  queryOptions?: Omit<
+    UseQueryOptions<PantryListResponse, ApiClientError>,
+    'queryKey' | 'queryFn'
+  >
+) {
+  return useQuery({
+    queryKey: queryKeys.pantry.staples(),
+    queryFn: () => pantryApi.listStaples(),
+    ...queryOptions,
+  });
+}
+
+/**
+ * Hook to add a pantry item
+ */
+export function useAddPantryItem(
+  mutationOptions?: Omit<
+    UseMutationOptions<AddPantryItemResponse, ApiClientError, AddPantryItemInput>,
+    'mutationFn'
+  >
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: AddPantryItemInput) => pantryApi.add(input),
+    onSuccess: () => {
+      // Invalidate all pantry queries to refetch
+      queryClient.invalidateQueries({ queryKey: queryKeys.pantry.all });
+    },
+    ...mutationOptions,
+  });
+}
+
+/**
+ * Hook to update a pantry item
+ */
+export function useUpdatePantryItem(
+  mutationOptions?: Omit<
+    UseMutationOptions<
+      PantryItemWithIngredient,
+      ApiClientError,
+      { ingredientName: string; input: UpdatePantryItemInput }
+    >,
+    'mutationFn'
+  >
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      ingredientName,
+      input,
+    }: {
+      ingredientName: string;
+      input: UpdatePantryItemInput;
+    }) => pantryApi.update(ingredientName, input),
+    onSuccess: () => {
+      // Invalidate all pantry queries to refetch
+      queryClient.invalidateQueries({ queryKey: queryKeys.pantry.all });
+    },
+    ...mutationOptions,
+  });
+}
+
+/**
+ * Hook to remove a pantry item
+ */
+export function useRemovePantryItem(
+  mutationOptions?: Omit<
+    UseMutationOptions<{ deleted: boolean }, ApiClientError, string>,
+    'mutationFn'
+  >
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ingredientName: string) => pantryApi.remove(ingredientName),
+    onSuccess: () => {
+      // Invalidate all pantry queries to refetch
+      queryClient.invalidateQueries({ queryKey: queryKeys.pantry.all });
+    },
+    ...mutationOptions,
+  });
+}
+
+/**
+ * Hook to use (decrement) a pantry item
+ */
+export function useUsePantryItem(
+  mutationOptions?: Omit<
+    UseMutationOptions<
+      PantryItemWithIngredient,
+      ApiClientError,
+      { ingredientName: string; quantity: number }
+    >,
+    'mutationFn'
+  >
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      ingredientName,
+      quantity,
+    }: {
+      ingredientName: string;
+      quantity: number;
+    }) => pantryApi.use(ingredientName, quantity),
+    onSuccess: () => {
+      // Invalidate all pantry queries to refetch
+      queryClient.invalidateQueries({ queryKey: queryKeys.pantry.all });
     },
     ...mutationOptions,
   });

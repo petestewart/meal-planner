@@ -34,6 +34,12 @@ import type {
   CheckPantryResponse,
   UserPreferences,
   UpdatePreferencesInput,
+  PantryItemWithIngredient,
+  PantryListResponse,
+  AddPantryItemInput,
+  AddPantryItemResponse,
+  UpdatePantryItemInput,
+  ListPantryOptions,
 } from '@/types/api';
 
 // ==================== Configuration ====================
@@ -442,6 +448,89 @@ export const preferencesApi = {
   },
 };
 
+// ==================== Pantry API ====================
+
+/**
+ * Pantry API methods
+ */
+export const pantryApi = {
+  /**
+   * List all pantry items
+   */
+  list: (options: ListPantryOptions = {}): Promise<PantryListResponse> => {
+    const queryString = buildQueryString(options);
+    return apiFetch<PantryListResponse>(`/pantry${queryString}`);
+  },
+
+  /**
+   * List items expiring within 7 days
+   */
+  listExpiring: (): Promise<PantryListResponse> => {
+    return apiFetch<PantryListResponse>('/pantry/expiring');
+  },
+
+  /**
+   * List staple items
+   */
+  listStaples: (): Promise<PantryListResponse> => {
+    return apiFetch<PantryListResponse>('/pantry/staples');
+  },
+
+  /**
+   * Add an item to the pantry
+   */
+  add: (input: AddPantryItemInput): Promise<AddPantryItemResponse> => {
+    return apiFetch<AddPantryItemResponse>('/pantry', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  },
+
+  /**
+   * Update a pantry item
+   */
+  update: (
+    ingredientName: string,
+    input: UpdatePantryItemInput
+  ): Promise<PantryItemWithIngredient> => {
+    return apiFetch<PantryItemWithIngredient>(
+      `/pantry/${encodeURIComponent(ingredientName)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }
+    );
+  },
+
+  /**
+   * Remove an item from the pantry
+   */
+  remove: (ingredientName: string): Promise<{ deleted: boolean }> => {
+    return apiFetch<{ deleted: boolean }>(
+      `/pantry/${encodeURIComponent(ingredientName)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+  },
+
+  /**
+   * Use (decrement) a pantry item quantity
+   */
+  use: (
+    ingredientName: string,
+    quantity: number
+  ): Promise<PantryItemWithIngredient> => {
+    return apiFetch<PantryItemWithIngredient>(
+      `/pantry/${encodeURIComponent(ingredientName)}/use`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ quantity }),
+      }
+    );
+  },
+};
+
 // ==================== Combined API Client ====================
 
 /**
@@ -452,6 +541,7 @@ export const api = {
   plans: planApi,
   grocery: groceryApi,
   preferences: preferencesApi,
+  pantry: pantryApi,
 };
 
 export default api;
