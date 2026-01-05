@@ -186,7 +186,7 @@ export function RecipeSelector({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-2xl sm:max-h-[85vh] h-[100dvh] sm:h-auto flex flex-col p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>
             Select Recipe for {DAY_NAMES[dayOfWeek]} {MEAL_TYPE_NAMES[mealType]}

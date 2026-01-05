@@ -51,7 +51,7 @@ export function RecipeCard({ recipe, className }: RecipeCardProps) {
           onClick={handleFavoriteClick}
           disabled={toggleFavorite.isPending}
           className={cn(
-            'absolute right-2 top-2 rounded-full p-2 transition-colors',
+            'absolute right-1 top-1 rounded-full p-2.5 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center',
             'bg-background/80 backdrop-blur-sm',
             'hover:bg-background',
             'focus:outline-none focus:ring-2 focus:ring-ring'

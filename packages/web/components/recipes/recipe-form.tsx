@@ -543,8 +543,8 @@ export function RecipeForm({
         </CardHeader>
         <CardContent className="space-y-3">
           {ingredients.map((ing, index) => (
-            <div key={ing.id} className="flex gap-2 items-start">
-              <div className="w-20">
+            <div key={ing.id} className="flex flex-wrap sm:flex-nowrap gap-2 items-start">
+              <div className="w-16 sm:w-20">
                 <Input
                   type="text"
                   value={ing.quantity}
@@ -553,7 +553,7 @@ export function RecipeForm({
                   className="text-center"
                 />
               </div>
-              <div className="w-24">
+              <div className="w-16 sm:w-24">
                 <Input
                   type="text"
                   value={ing.unit}
@@ -561,7 +561,7 @@ export function RecipeForm({
                   placeholder="Unit"
                 />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-[120px]">
                 <Input
                   type="text"
                   value={ing.name}
@@ -583,7 +583,7 @@ export function RecipeForm({
                 size="icon"
                 onClick={() => removeIngredient(ing.id)}
                 disabled={ingredients.length <= 1}
-                className="shrink-0"
+                className="shrink-0 h-10 w-10 touch-manipulation"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -636,7 +636,7 @@ export function RecipeForm({
                 size="icon"
                 onClick={() => removeInstruction(inst.id)}
                 disabled={instructions.length <= 1}
-                className="shrink-0"
+                className="shrink-0 h-10 w-10 touch-manipulation"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

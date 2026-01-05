@@ -95,7 +95,7 @@ export function GroceryItem({ item, week, className }: GroceryItemProps) {
         onClick={handleStatusToggle}
         disabled={updateItem.isPending}
         className={cn(
-          'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border transition-colors',
+          'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border transition-colors touch-manipulation',
           'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
           'disabled:cursor-not-allowed disabled:opacity-50',
           isChecked && 'border-primary bg-primary text-primary-foreground',

@@ -612,8 +612,8 @@ packages/web/
 
 ### Ticket: U024 Implement responsive design polish
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U024
 - **Scope:** Ensure all views work well on mobile through desktop
 - **Acceptance Criteria:**
   - All views usable at 375px width

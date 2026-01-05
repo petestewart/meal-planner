@@ -51,7 +51,7 @@ export function RecipeActions({
   };
 
   return (
-    <div className={cn('flex items-center gap-2', className)}>
+    <div className={cn('flex items-center gap-1', className)}>
       {/* Favorite Button */}
       <Button
         type="button"
@@ -60,6 +60,7 @@ export function RecipeActions({
         onClick={handleFavoriteClick}
         disabled={toggleFavorite.isPending}
         aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        className="h-10 w-10 sm:h-9 sm:w-9 touch-manipulation"
       >
         <Heart
           className={cn(
@@ -72,7 +73,7 @@ export function RecipeActions({
       </Button>
 
       {/* Edit Button */}
-      <Button variant="ghost" size="icon" asChild aria-label="Edit recipe">
+      <Button variant="ghost" size="icon" asChild aria-label="Edit recipe" className="h-10 w-10 sm:h-9 sm:w-9 touch-manipulation">
         <Link href={`/recipes/${recipeId}/edit`}>
           <Pencil className="h-5 w-5" />
         </Link>
@@ -86,7 +87,7 @@ export function RecipeActions({
             variant="ghost"
             size="icon"
             aria-label="Delete recipe"
-            className="text-muted-foreground hover:text-destructive"
+            className="text-muted-foreground hover:text-destructive h-10 w-10 sm:h-9 sm:w-9 touch-manipulation"
           >
             <Trash2 className="h-5 w-5" />
           </Button>

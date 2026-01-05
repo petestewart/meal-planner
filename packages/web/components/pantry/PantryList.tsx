@@ -168,20 +168,20 @@ export function PantryListView({ className }: PantryListViewProps) {
       </div>
 
       {/* Location filter tabs */}
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-1 sm:gap-2 border-b overflow-x-auto">
         {LOCATION_TABS.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setLocationFilter(tab.value)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
+              'flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px touch-manipulation min-h-[44px] whitespace-nowrap',
               locationFilter === tab.value
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted'
             )}
           >
             {tab.icon}
-            {tab.label}
+            <span className="hidden xs:inline sm:inline">{tab.label}</span>
           </button>
         ))}
       </div>

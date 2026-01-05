@@ -173,12 +173,12 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
       </div>
 
       {/* Actions */}
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         {item.quantity !== null && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-10 w-10 sm:h-9 sm:w-9 touch-manipulation"
             onClick={handleUse}
             disabled={isPending}
             title="Use 1"
@@ -189,7 +189,7 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-10 w-10 sm:h-9 sm:w-9 touch-manipulation"
           onClick={() => onEdit(item)}
           disabled={isPending}
           title="Edit"
@@ -199,7 +199,7 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-destructive hover:text-destructive"
+          className="h-10 w-10 sm:h-9 sm:w-9 text-destructive hover:text-destructive touch-manipulation"
           onClick={handleRemove}
           disabled={isPending}
           title="Remove"
