@@ -390,8 +390,8 @@ packages/web/
 
 ### Ticket: U012 Build recipe form (add/edit)
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U012
 - **Scope:** Create form for manually adding or editing recipes
 - **Acceptance Criteria:**
   - Fields: title, description, servings, prep/cook time, cuisine

@@ -20,3 +20,6 @@ export { RecipeActions, AddToPlanButton } from './recipe-actions';
 export { RecipeImportForm } from './recipe-import-form';
 export { RecipePreview } from './recipe-preview';
 export type { RecipePreviewUpdates } from './recipe-preview';
+
+// Recipe form components
+export { RecipeForm } from './recipe-form';
