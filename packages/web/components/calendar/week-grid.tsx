@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -11,8 +11,9 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { usePlan, usePreferences, useSetMeal, queryKeys } from '@/lib/queries';
 import { useRecipes } from '@/lib/queries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -58,6 +59,9 @@ export function WeekGrid({
 }: WeekGridProps) {
   const [currentWeek, setCurrentWeek] = useState(initialWeek || getCurrentWeek());
   const [activeDragData, setActiveDragData] = useState<DragData | null>(null);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const mobileContainerRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
   const queryClient = useQueryClient();
 
   // Configure sensors for both pointer (mouse) and touch input
@@ -125,6 +129,12 @@ export function WeekGrid({
 
   // Get week dates
   const weekDates = useMemo(() => getWeekDates(currentWeek), [currentWeek]);
+
+  // Set selected day to today if it's in the current week, otherwise reset to 0
+  useEffect(() => {
+    const todayIndex = weekDates.findIndex((date) => isToday(date));
+    setSelectedDayIndex(todayIndex >= 0 ? todayIndex : 0);
+  }, [weekDates]);
 
   // Create a map of plan items by day and meal type
   const planItemMap = useMemo(() => {
@@ -287,6 +297,40 @@ export function WeekGrid({
 
   const isThisWeek = isCurrentWeek(currentWeek);
 
+  // Mobile swipe handlers for day navigation
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX.current - touchEndX;
+    const threshold = 50; // minimum swipe distance
+
+    if (Math.abs(diff) > threshold) {
+      if (diff > 0 && selectedDayIndex < 6) {
+        // Swipe left -> next day
+        setSelectedDayIndex((prev) => prev + 1);
+      } else if (diff < 0 && selectedDayIndex > 0) {
+        // Swipe right -> previous day
+        setSelectedDayIndex((prev) => prev - 1);
+      }
+    }
+
+    touchStartX.current = null;
+  }, [selectedDayIndex]);
+
+  // Handle FAB click - add meal for selected day and first meal type
+  const handleFabClick = useCallback(() => {
+    const selectedDate = weekDates[selectedDayIndex];
+    const day = getDayOfWeek(selectedDate) as DayOfWeek;
+    // Default to first meal type
+    const defaultMealType = mealTypes[0];
+    onAddMeal?.(day, defaultMealType);
+  }, [weekDates, selectedDayIndex, mealTypes, onAddMeal]);
+
   return (
     <DndContext
       sensors={sensors}
@@ -297,45 +341,47 @@ export function WeekGrid({
       <div className="space-y-4">
         {/* Week Navigation Header */}
         <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handlePreviousWeek}
+              aria-label="Previous week"
+              className="h-10 w-10"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleNextWeek}
+              aria-label="Next week"
+              className="h-10 w-10"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold font-display">
+              {formatWeekDisplay(currentWeek)}
+            </h2>
+            {isThisWeek && (
+              <Badge variant="today">This Week</Badge>
+            )}
+          </div>
+
           <Button
             variant="outline"
-            size="icon"
-            onClick={handlePreviousWeek}
-            aria-label="Previous week"
+            size="default"
+            onClick={handleTodayClick}
+            disabled={isThisWeek}
+            className="gap-2"
           >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleNextWeek}
-            aria-label="Next week"
-          >
-            <ChevronRight className="h-4 w-4" />
+            <Calendar className="h-4 w-4" />
+            Today
           </Button>
         </div>
-
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">
-            {formatWeekDisplay(currentWeek)}
-          </h2>
-          {isThisWeek && (
-            <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
-              This Week
-            </span>
-          )}
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleTodayClick}
-          disabled={isThisWeek}
-        >
-          Today
-        </Button>
-      </div>
 
       {/* Loading State - Skeleton */}
       {isPlanLoading && (
@@ -375,12 +421,17 @@ export function WeekGrid({
                     <div
                       key={index}
                       className={cn(
-                        'text-center py-2 rounded-md',
-                        today && 'bg-primary text-primary-foreground'
+                        'text-center py-3 rounded-lg transition-colors',
+                        today
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted/30'
                       )}
                     >
-                      <div className="text-sm font-medium">{getDayName(date)}</div>
-                      <div className={cn('text-xs', today ? 'text-primary-foreground' : 'text-muted-foreground')}>
+                      <div className="text-base font-semibold">{getDayName(date)}</div>
+                      <div className={cn(
+                        'text-sm font-mono',
+                        today ? 'text-primary-foreground/90' : 'text-muted-foreground'
+                      )}>
                         {formatDayNumber(date)}
                       </div>
                     </div>
@@ -392,8 +443,8 @@ export function WeekGrid({
               {mealTypes.map((mealType) => (
                 <div key={mealType} className="grid grid-cols-[80px_repeat(7,1fr)] gap-1 mb-1">
                   {/* Meal Type Label */}
-                  <div className="flex items-center justify-end pr-2">
-                    <span className="text-sm font-medium capitalize text-muted-foreground">
+                  <div className="flex items-center justify-end pr-3 h-full">
+                    <span className="text-sm font-semibold capitalize text-muted-foreground tracking-wide">
                       {mealType}
                     </span>
                   </div>
@@ -403,17 +454,25 @@ export function WeekGrid({
                     const day = getDayOfWeek(date) as DayOfWeek;
                     const planItem = getPlanItem(day, mealType);
                     const recipe = getRecipe(planItem);
+                    const today = isToday(date);
 
                     return (
-                      <MealSlot
+                      <div
                         key={`${day}-${mealType}`}
-                        day={day}
-                        mealType={mealType}
-                        planItem={planItem}
-                        recipe={recipe}
-                        onAddClick={() => onAddMeal?.(day, mealType)}
-                        onSlotClick={() => onSlotClick?.(day, mealType, planItem)}
-                      />
+                        className={cn(
+                          'rounded-lg transition-colors',
+                          today && 'bg-primary/5'
+                        )}
+                      >
+                        <MealSlot
+                          day={day}
+                          mealType={mealType}
+                          planItem={planItem}
+                          recipe={recipe}
+                          onAddClick={() => onAddMeal?.(day, mealType)}
+                          onSlotClick={() => onSlotClick?.(day, mealType, planItem)}
+                        />
+                      </div>
                     );
                   })}
                 </div>
@@ -421,47 +480,97 @@ export function WeekGrid({
             </div>
           </div>
 
-          {/* Mobile View - Single/Multi-day cards */}
-          <div className="md:hidden space-y-4">
-            {weekDates.map((date, index) => {
-              const day = getDayOfWeek(date) as DayOfWeek;
-              const today = isToday(date);
+          {/* Mobile View - Single day with horizontal date picker and swipe */}
+          <div className="md:hidden relative">
+            {/* Horizontal Date Picker */}
+            <div className="flex gap-1 overflow-x-auto pb-3 mb-4 scrollbar-hide -mx-1 px-1">
+              {weekDates.map((date, index) => {
+                const today = isToday(date);
+                const selected = index === selectedDayIndex;
 
-              return (
-                <div
-                  key={index}
-                  className={cn(
-                    'rounded-lg border p-3',
-                    today && 'border-primary bg-primary/5'
-                  )}
-                >
-                  {/* Day Header */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{getDayName(date)}</span>
-                      <span className="text-muted-foreground">
-                        {formatDayNumber(date)}
-                      </span>
-                    </div>
-                    {today && (
-                      <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
-                        Today
-                      </span>
+                return (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => setSelectedDayIndex(index)}
+                    className={cn(
+                      'flex flex-col items-center justify-center min-w-[52px] h-[66px] rounded-xl transition-all duration-200',
+                      'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                      selected
+                        ? 'bg-primary text-primary-foreground shadow-md scale-105'
+                        : today
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-muted/40 text-foreground hover:bg-muted'
                     )}
-                  </div>
+                    aria-label={`Select ${getDayName(date)} ${formatDayNumber(date)}`}
+                    aria-pressed={selected}
+                  >
+                    <span className="text-xs font-medium uppercase tracking-wide">
+                      {getDayName(date).slice(0, 3)}
+                    </span>
+                    <span className="text-lg font-semibold font-mono">
+                      {formatDayNumber(date)}
+                    </span>
+                    {today && !selected && (
+                      <span className="h-1 w-1 rounded-full bg-primary mt-0.5" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
 
-                  {/* Meals for the day */}
-                  <div className="space-y-2">
-                    {mealTypes.map((mealType) => {
-                      const planItem = getPlanItem(day, mealType);
-                      const recipe = getRecipe(planItem);
+            {/* Selected Day View with swipe */}
+            <div
+              ref={mobileContainerRef}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              className="touch-pan-y"
+            >
+              {(() => {
+                const date = weekDates[selectedDayIndex];
+                const day = getDayOfWeek(date) as DayOfWeek;
+                const today = isToday(date);
 
-                      return (
-                        <div key={mealType} className="flex items-start gap-3">
-                          <span className="w-16 text-sm font-medium capitalize text-muted-foreground pt-2">
-                            {mealType}
-                          </span>
-                          <div className="flex-1">
+                return (
+                  <div
+                    className={cn(
+                      'rounded-xl border p-4 transition-all duration-200',
+                      today ? 'border-primary bg-primary/5 shadow-sm' : 'border-border'
+                    )}
+                  >
+                    {/* Day Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-semibold font-display">
+                          {getDayName(date)}
+                        </span>
+                        <span className="text-sm font-mono text-muted-foreground">
+                          {formatDayNumber(date)}
+                        </span>
+                      </div>
+                      {today && (
+                        <Badge variant="today">Today</Badge>
+                      )}
+                    </div>
+
+                    {/* Swipe hint */}
+                    <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
+                      <ChevronLeft className="h-3 w-3" />
+                      <span>Swipe to change day</span>
+                      <ChevronRight className="h-3 w-3" />
+                    </p>
+
+                    {/* Meals for the day - vertical list */}
+                    <div className="space-y-3">
+                      {mealTypes.map((mealType) => {
+                        const planItem = getPlanItem(day, mealType);
+                        const recipe = getRecipe(planItem);
+
+                        return (
+                          <div key={mealType}>
+                            <span className="block text-sm font-semibold capitalize text-muted-foreground mb-2 tracking-wide">
+                              {mealType}
+                            </span>
                             <MealSlot
                               day={day}
                               mealType={mealType}
@@ -471,13 +580,50 @@ export function WeekGrid({
                               onSlotClick={() => onSlotClick?.(day, mealType, planItem)}
                             />
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })()}
+            </div>
+
+            {/* Day navigation indicators */}
+            <div className="flex justify-center gap-1.5 mt-4">
+              {weekDates.map((_, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setSelectedDayIndex(index)}
+                  className={cn(
+                    'h-1.5 rounded-full transition-all duration-200',
+                    index === selectedDayIndex
+                      ? 'w-6 bg-primary'
+                      : 'w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                  )}
+                  aria-label={`Go to day ${index + 1}`}
+                />
+              ))}
+            </div>
+
+            {/* Floating Action Button (FAB) for quick meal add */}
+            <button
+              type="button"
+              onClick={handleFabClick}
+              className={cn(
+                'fixed bottom-20 right-4 z-40',
+                'flex h-14 w-14 items-center justify-center rounded-full',
+                'bg-primary text-primary-foreground shadow-lg',
+                'transition-all duration-200 ease-spring',
+                'hover:scale-105 hover:shadow-xl',
+                'active:scale-95',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                'safe-area-inset-bottom'
+              )}
+              aria-label="Add meal to selected day"
+            >
+              <Plus className="h-6 w-6" strokeWidth={2.5} />
+            </button>
           </div>
         </>
       )}

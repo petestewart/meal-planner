@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Pencil, Trash2, Minus, ChefHat, Star, MapPin, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useRemovePantryItem, useUsePantryItem } from '@/lib/queries';
 import type { PantryItemWithIngredient } from '@/types/api';
@@ -104,11 +105,13 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
   const isPending = removeItem.isPending || useItem.isPending;
 
   return (
-    <div
+    <Card
+      variant="flat"
       className={cn(
-        'flex items-start gap-3 rounded-lg border p-3 transition-colors',
-        expired && 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/20',
-        expiringSoon && !expired && 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20',
+        'flex items-start gap-3 p-3 transition-all duration-200 hover:bg-muted/30',
+        expired && 'border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/20',
+        expiringSoon && !expired && 'border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20',
+        !expired && !expiringSoon && 'border border-transparent bg-muted/20',
         className
       )}
     >
@@ -133,16 +136,16 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
           </div>
 
           {/* Quantity */}
-          <span className="shrink-0 text-sm tabular-nums font-medium">
+          <span className="shrink-0 text-sm font-mono tabular-nums font-medium">
             {formatQuantity(item.quantity, item.unit)}
           </span>
         </div>
 
         {/* Meta info row */}
-        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        <div className="mt-1.5 flex flex-wrap items-center gap-3 text-body-sm text-muted-foreground">
           {item.location && (
             <span className={cn('flex items-center gap-1', locationInfo.color)}>
-              <MapPin className="h-3 w-3" />
+              <MapPin className="h-3.5 w-3.5" />
               {locationInfo.label}
             </span>
           )}
@@ -154,31 +157,28 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
                 expiringSoon && !expired && 'font-medium text-amber-600 dark:text-amber-400'
               )}
             >
-              <Clock className="h-3 w-3" />
+              <Clock className="h-3.5 w-3.5" />
               {expired ? 'Expired ' : expiringSoon ? 'Expires ' : 'Exp '}
               {formatExpirationDate(item.expiresAt)}
             </span>
-          )}
-          {item.ingredientCategory && (
-            <span className="text-xs">{item.ingredientCategory}</span>
           )}
         </div>
 
         {/* Preparation notes */}
         {item.isPrepared && item.preparationNotes && (
-          <p className="mt-1 text-sm text-muted-foreground italic">
+          <p className="mt-1.5 text-body-sm text-muted-foreground italic">
             {item.preparationNotes}
           </p>
         )}
       </div>
 
       {/* Actions */}
-      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         {item.quantity !== null && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-10 w-10 sm:h-9 sm:w-9 touch-manipulation"
+            className="h-11 w-11 sm:h-10 sm:w-10 touch-manipulation rounded-sm"
             onClick={handleUse}
             disabled={isPending}
             aria-label={`Use one ${item.ingredientName}`}
@@ -189,7 +189,7 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 sm:h-9 sm:w-9 touch-manipulation"
+          className="h-11 w-11 sm:h-10 sm:w-10 touch-manipulation rounded-sm"
           onClick={() => onEdit(item)}
           disabled={isPending}
           aria-label={`Edit ${item.ingredientName}`}
@@ -199,7 +199,7 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 sm:h-9 sm:w-9 text-destructive hover:text-destructive touch-manipulation"
+          className="h-11 w-11 sm:h-10 sm:w-10 text-destructive hover:text-destructive touch-manipulation rounded-sm"
           onClick={handleRemove}
           disabled={isPending}
           aria-label={`Remove ${item.ingredientName}`}
@@ -207,6 +207,6 @@ export function PantryItem({ item, onEdit, className }: PantryItemProps) {
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
-    </div>
+    </Card>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { Moon, Sun, Settings } from "lucide-react";
+import { Moon, Sun, Settings, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Header() {
@@ -10,10 +10,11 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-14 items-center px-4">
+      <div className="flex h-14 md:h-16 items-center px-4">
         <div className="flex flex-1 items-center">
-          <Link href="/" className="flex items-center space-x-2">
-            <span className="text-xl font-bold">Meal Planner</span>
+          <Link href="/" className="flex items-center gap-2">
+            <Utensils className="h-6 w-6 text-primary" />
+            <span className="font-display text-xl font-semibold">Meal Planner</span>
           </Link>
         </div>
         <div className="flex items-center gap-2">

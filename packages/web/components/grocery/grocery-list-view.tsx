@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, ShoppingCart, Check, ShoppingBag, Package } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronLeft, ChevronRight, RefreshCw, ShoppingCart, Check, ShoppingBag, Package, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -185,13 +186,14 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
         </div>
       </div>
 
-      {/* Week navigation */}
-      <div className="flex items-center justify-center gap-2">
+      {/* Week navigation with improved styling */}
+      <div className="flex items-center justify-center gap-1">
         <Button
           variant="ghost"
           size="icon"
           onClick={handlePreviousWeek}
           aria-label="Previous week"
+          className="h-10 w-10 rounded-full transition-all duration-200 hover:bg-primary/10 hover:text-primary"
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
@@ -199,11 +201,11 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
         <Button
           variant={isCurrentWeek ? 'secondary' : 'outline'}
           onClick={handleCurrentWeek}
-          className="min-w-[180px]"
+          className="min-w-[200px] gap-2 rounded-full px-6 font-medium transition-all duration-300"
         >
           {formatWeekDisplay(week)}
           {isCurrentWeek && (
-            <Badge variant="default" className="ml-2">
+            <Badge variant="today" className="ml-1">
               This Week
             </Badge>
           )}
@@ -214,23 +216,33 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
           size="icon"
           onClick={handleNextWeek}
           aria-label="Next week"
+          className="h-10 w-10 rounded-full transition-all duration-200 hover:bg-primary/10 hover:text-primary"
         >
           <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
 
-      {/* Progress indicator */}
+      {/* Progress indicator with visual progress bar */}
       {hasItems && (
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Check className="h-4 w-4" />
-          <span>
-            {checkedItems} of {totalItems} items checked
-          </span>
-          {checkedItems === totalItems && totalItems > 0 && (
-            <Badge variant="default" className="bg-green-600">
-              Complete!
-            </Badge>
-          )}
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Check className="h-4 w-4" />
+            <span className="font-medium">
+              {checkedItems} of {totalItems} items
+            </span>
+            {checkedItems === totalItems && totalItems > 0 && (
+              <Badge variant="default" className="bg-success text-success-foreground">
+                Complete!
+              </Badge>
+            )}
+          </div>
+          {/* Visual progress bar */}
+          <div className="h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+              style={{ width: `${(checkedItems / totalItems) * 100}%` }}
+            />
+          </div>
         </div>
       )}
 
@@ -247,18 +259,28 @@ export function GroceryListView({ initialWeek, className }: GroceryListViewProps
 
       {/* Empty state */}
       {!isLoading && !isError && !hasItems && (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-          <ShoppingCart className="h-12 w-12 text-muted-foreground/50" />
-          <h3 className="mt-4 text-lg font-semibold">No grocery list yet</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Generate a grocery list from your meal plan for this week.
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed bg-muted/30 py-12 px-6 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+            <ShoppingCart className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-h3 font-display">Your grocery list is empty</h3>
+          <p className="mt-2 text-body-sm text-muted-foreground max-w-sm">
+            Once you plan your meals for the week, we can automatically generate a shopping list with everything you need.
           </p>
-          <Button className="mt-4" onClick={handleGenerate} disabled={generateList.isPending}>
-            <RefreshCw
-              className={cn('h-4 w-4 mr-2', generateList.isPending && 'animate-spin')}
-            />
-            Generate Grocery List
-          </Button>
+          <div className="mt-6 flex flex-wrap gap-3 justify-center">
+            <Button onClick={handleGenerate} disabled={generateList.isPending}>
+              <RefreshCw
+                className={cn('h-4 w-4', generateList.isPending && 'animate-spin')}
+              />
+              Generate from Meal Plan
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/calendar">
+                <Calendar className="h-4 w-4" />
+                Plan Your Meals
+              </Link>
+            </Button>
+          </div>
         </div>
       )}
 

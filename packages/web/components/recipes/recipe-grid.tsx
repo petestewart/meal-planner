@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { BookOpen, Plus, Download } from 'lucide-react';
 import { RecipeWithRelations } from '@/types/api';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { RecipeCard } from './recipe-card';
 
@@ -15,20 +14,25 @@ interface RecipeGridProps {
 }
 
 /**
+ * Responsive grid classes for recipe layout:
+ * - 1 column on mobile (< 640px)
+ * - 2 columns on small tablets (>= 640px)
+ * - 3 columns on large tablets (>= 1024px)
+ * - 4 columns on desktop (>= 1280px)
+ */
+const gridClasses =
+  'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6';
+
+/**
  * Recipe grid layout with loading skeletons and empty state
  */
 export function RecipeGrid({ recipes, isLoading, className }: RecipeGridProps) {
   // Loading state
   if (isLoading) {
     return (
-      <div
-        className={cn(
-          'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
-          className
-        )}
-      >
+      <div className={cn(gridClasses, className)}>
         {Array.from({ length: 8 }).map((_, i) => (
-          <RecipeCardSkeleton key={i} />
+          <RecipeCardSkeleton key={i} index={i} />
         ))}
       </div>
     );
@@ -41,12 +45,7 @@ export function RecipeGrid({ recipes, isLoading, className }: RecipeGridProps) {
 
   // Grid of recipe cards
   return (
-    <div
-      className={cn(
-        'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
-        className
-      )}
-    >
+    <div className={cn(gridClasses, className)}>
       {recipes.map((recipe) => (
         <RecipeCard key={recipe.id} recipe={recipe} />
       ))}
@@ -54,24 +53,59 @@ export function RecipeGrid({ recipes, isLoading, className }: RecipeGridProps) {
   );
 }
 
+interface RecipeCardSkeletonProps {
+  index?: number;
+}
+
 /**
- * Loading skeleton for recipe card
+ * Loading skeleton for recipe card with shimmer animation
+ * Uses staggered animation delay for visual interest
  */
-function RecipeCardSkeleton() {
+function RecipeCardSkeleton({ index = 0 }: RecipeCardSkeletonProps) {
+  // Stagger animation delay based on index (0-400ms)
+  const animationDelay = `${(index % 4) * 100}ms`;
+
   return (
-    <div className="rounded-xl border bg-card shadow">
-      {/* Image placeholder */}
-      <Skeleton className="aspect-[4/3] w-full rounded-t-xl rounded-b-none" />
+    <div
+      className="rounded-xl border bg-card shadow-sm overflow-hidden"
+      style={{ animationDelay }}
+    >
+      {/* Image placeholder - 3:4 aspect ratio to match recipe cards */}
+      <div
+        className="aspect-[3/4] w-full animate-shimmer"
+        style={{ animationDelay }}
+      />
 
       {/* Content */}
       <div className="p-4 space-y-3">
         {/* Title */}
-        <Skeleton className="h-5 w-3/4" />
+        <div
+          className="h-5 w-3/4 rounded animate-shimmer"
+          style={{ animationDelay }}
+        />
 
-        {/* Meta */}
+        {/* Meta row */}
         <div className="flex gap-3">
-          <Skeleton className="h-4 w-12" />
-          <Skeleton className="h-4 w-16" />
+          <div
+            className="h-4 w-14 rounded animate-shimmer"
+            style={{ animationDelay }}
+          />
+          <div
+            className="h-4 w-16 rounded animate-shimmer"
+            style={{ animationDelay }}
+          />
+        </div>
+
+        {/* Tags row */}
+        <div className="flex gap-2 pt-1">
+          <div
+            className="h-6 w-16 rounded-full animate-shimmer"
+            style={{ animationDelay }}
+          />
+          <div
+            className="h-6 w-20 rounded-full animate-shimmer"
+            style={{ animationDelay }}
+          />
         </div>
       </div>
     </div>
@@ -85,14 +119,16 @@ function RecipeEmptyState({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 p-12 text-center',
+        'flex flex-col items-center justify-center rounded-xl border-2 border-dashed bg-muted/30 py-12 px-6 text-center',
         className
       )}
     >
-      <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-      <h3 className="text-lg font-semibold">No recipes yet</h3>
-      <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-        Start building your collection by adding recipes manually or importing from the web.
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+        <BookOpen className="h-8 w-8 text-muted-foreground" />
+      </div>
+      <h3 className="text-h3 font-display">No recipes yet</h3>
+      <p className="mt-2 text-body-sm text-muted-foreground max-w-sm">
+        Your recipe collection is waiting to be filled! Add your favorite dishes manually or import them from your favorite cooking websites.
       </p>
       <div className="mt-6 flex flex-wrap gap-3 justify-center">
         <Button asChild>

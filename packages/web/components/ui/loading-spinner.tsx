@@ -24,8 +24,12 @@ export function LoadingSpinner({
   label,
 }: LoadingSpinnerProps) {
   return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <Loader2 className={cn('animate-spin text-muted-foreground', sizeClasses[size])} />
+    <div
+      role="status"
+      aria-label={label || 'Loading'}
+      className={cn('flex items-center gap-2', className)}
+    >
+      <Loader2 className={cn('animate-spin text-muted-foreground', sizeClasses[size])} aria-hidden="true" />
       {label && <span className="text-sm text-muted-foreground">{label}</span>}
     </div>
   );
@@ -42,14 +46,16 @@ interface LoadingOverlayProps {
 export function LoadingOverlay({ label, className }: LoadingOverlayProps) {
   return (
     <div
+      role="status"
+      aria-label={label || 'Loading content'}
       className={cn(
         'flex flex-col items-center justify-center py-12 text-center',
         className
       )}
     >
-      <LoadingSpinner size="lg" />
+      <LoadingSpinner size="lg" label={label} />
       {label && (
-        <p className="mt-4 text-muted-foreground">{label}</p>
+        <p className="mt-4 text-muted-foreground" aria-hidden="true">{label}</p>
       )}
     </div>
   );

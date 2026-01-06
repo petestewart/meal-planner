@@ -92,8 +92,10 @@ export function RecipeFilters({
             onChange={handleCuisineChange}
             aria-label="Filter by cuisine"
             className={cn(
-              'h-9 appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm',
-              'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+              'h-11 appearance-none rounded-sm border-[1.5px] border-input bg-background px-3 pr-8 text-sm',
+              'transition-all duration-200 ease-out',
+              'focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20',
+              'hover:border-primary/50',
               'cursor-pointer'
             )}
           >
@@ -114,8 +116,10 @@ export function RecipeFilters({
             onChange={handleSortChange}
             aria-label="Sort recipes"
             className={cn(
-              'h-9 appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm',
-              'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+              'h-11 appearance-none rounded-sm border-[1.5px] border-input bg-background px-3 pr-8 text-sm',
+              'transition-all duration-200 ease-out',
+              'focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20',
+              'hover:border-primary/50',
               'cursor-pointer'
             )}
           >
@@ -126,12 +130,11 @@ export function RecipeFilters({
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         </div>
 
-        {/* Favorites toggle */}
+        {/* Favorites toggle - uses default size for 44px touch target */}
         <Button
           variant={filters.favorites ? 'default' : 'outline'}
-          size="sm"
           onClick={handleFavoritesToggle}
-          className="gap-1"
+          className="gap-1.5"
           aria-pressed={filters.favorites}
         >
           <Heart

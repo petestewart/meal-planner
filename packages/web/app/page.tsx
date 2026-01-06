@@ -8,18 +8,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Calendar,
   UtensilsCrossed,
   ShoppingCart,
-  Package,
   ChevronRight,
   Clock,
-  AlertTriangle,
   Loader2,
   Plus,
+  Sun,
+  Sunset,
+  Moon,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import Link from "next/link";
 import { usePlan, useRecipes, usePreferences } from "@/lib/queries";
@@ -28,7 +30,6 @@ import {
   getWeekDates,
   formatWeekDisplay,
   getDayName,
-  formatDayNumber,
   isToday,
   getDayOfWeek,
 } from "@/lib/week-utils";
@@ -39,43 +40,58 @@ import {
   RecipeWithRelations,
 } from "@/types/api";
 import { cn } from "@/lib/utils";
-import { isTomorrow as dateFnsIsTomorrow } from "date-fns";
 
-// Quick action buttons configuration
-const quickActions = [
+// Helper to get time-based greeting (similar to navigation.tsx)
+function getGreeting(): { text: string; subtext: string; icon: typeof Sun } {
+  const hour = new Date().getHours();
+  if (hour < 12) {
+    return { text: "Good morning", subtext: "Ready to plan your day?", icon: Sun };
+  }
+  if (hour < 17) {
+    return { text: "Good afternoon", subtext: "What's cooking today?", icon: Sunset };
+  }
+  return { text: "Good evening", subtext: "Time to unwind with a meal", icon: Moon };
+}
+
+// Quick action tiles configuration
+const quickActionTiles = [
   {
     href: "/calendar",
-    title: "Plan Week",
-    description: "Plan your meals",
+    title: "Plan Meals",
+    description: "Organize your week",
     icon: Calendar,
-    variant: "default" as const,
+    color: "bg-primary/10 text-primary hover:bg-primary/20",
   },
   {
-    href: "/recipes",
+    href: "/recipes/new",
     title: "Add Recipe",
-    description: "Create new recipe",
+    description: "Save a new dish",
     icon: Plus,
-    variant: "outline" as const,
+    color: "bg-secondary/10 text-secondary hover:bg-secondary/20",
   },
   {
     href: "/grocery",
     title: "Grocery List",
-    description: "View shopping list",
+    description: "View shopping items",
     icon: ShoppingCart,
-    variant: "outline" as const,
+    color: "bg-accent/30 text-accent-foreground hover:bg-accent/40",
+  },
+  {
+    href: "/recipes",
+    title: "Browse Recipes",
+    description: "Find something to cook",
+    icon: UtensilsCrossed,
+    color: "bg-muted text-muted-foreground hover:bg-muted/80",
   },
 ];
-
-// Helper to check if a date is tomorrow
-function isTomorrow(date: Date): boolean {
-  return dateFnsIsTomorrow(date);
-}
 
 // Default meal types if preferences aren't loaded
 const DEFAULT_MEAL_TYPES: MealType[] = ['lunch', 'dinner'];
 
 export default function Home() {
   const currentWeek = getCurrentWeek();
+  const greeting = getGreeting();
+  const GreetingIcon = greeting.icon;
 
   // Fetch current week's plan
   const {
@@ -150,301 +166,297 @@ export default function Home() {
     return recipeMap.get(planItem.recipeId);
   };
 
-  // Recently added recipes (top 6)
-  const recentRecipes = recipesData?.recipes?.slice(0, 6) ?? [];
+  // Get today's date and day of week
+  const todayDate = weekDates.find(d => isToday(d));
+  const todayDayOfWeek = todayDate ? getDayOfWeek(todayDate) as DayOfWeek : null;
 
-  // Mock expiring pantry items (since pantry API doesn't exist yet)
-  // In the future, this would come from a real pantry API
-  const expiringItems: { name: string; daysLeft: number }[] = [
-    // Example placeholder data - commented out for production
-    // { name: "Milk", daysLeft: 2 },
-    // { name: "Chicken Breast", daysLeft: 3 },
-    // { name: "Spinach", daysLeft: 1 },
-  ];
+  // Get today's meals
+  const todayMeals = useMemo(() => {
+    if (!todayDayOfWeek) return [];
+    return mealTypes.map(mealType => {
+      const planItem = getPlanItem(todayDayOfWeek, mealType);
+      const recipe = getRecipe(planItem);
+      return {
+        mealType,
+        planItem,
+        recipe,
+      };
+    });
+  }, [todayDayOfWeek, mealTypes, planItemMap, recipeMap]);
+
+  // Calculate week progress (how many slots are filled vs total)
+  const weekProgress = useMemo(() => {
+    const totalSlots = weekDates.length * mealTypes.length;
+    let filledSlots = 0;
+
+    for (const date of weekDates) {
+      const day = getDayOfWeek(date) as DayOfWeek;
+      for (const mealType of mealTypes) {
+        const planItem = getPlanItem(day, mealType);
+        if (planItem?.recipeId || (planItem?.slotType && planItem.slotType !== 'recipe')) {
+          filledSlots++;
+        }
+      }
+    }
+
+    return { filled: filledSlots, total: totalSlots, percentage: Math.round((filledSlots / totalSlots) * 100) };
+  }, [weekDates, mealTypes, planItemMap]);
+
+  // Recently added recipes (top 4)
+  const recentRecipes = recipesData?.recipes?.slice(0, 4) ?? [];
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-6 max-w-4xl">
       <div className="space-y-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Welcome to Meal Planner</h1>
-          <p className="mt-2 text-muted-foreground">
-            Plan your meals, organize recipes, and manage your grocery list all in one place.
-          </p>
+        {/* Greeting Section */}
+        <div className="flex items-start gap-4">
+          <div className="p-3 rounded-full bg-primary/10">
+            <GreetingIcon className="h-8 w-8 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-display font-display text-foreground">
+              {greeting.text}
+            </h1>
+            <p className="text-body text-muted-foreground mt-1">
+              {greeting.subtext}
+            </p>
+          </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="flex flex-wrap gap-3">
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Button
-                key={action.href}
-                asChild
-                variant={action.variant}
-                size="lg"
-                className="gap-2"
-              >
-                <Link href={action.href}>
-                  <Icon className="h-5 w-5" />
-                  {action.title}
-                </Link>
-              </Button>
-            );
-          })}
-        </div>
+        {/* Today's Meals - Horizontal Scroll Widget */}
+        <section aria-labelledby="todays-meals-heading">
+          <div className="flex items-center justify-between mb-4">
+            <h2 id="todays-meals-heading" className="text-h2 font-display">Today&apos;s Meals</h2>
+            <Link
+              href="/calendar"
+              className="text-body-sm text-primary hover:text-primary-hover flex items-center gap-1 transition-colors"
+            >
+              View week
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
 
-        {/* This Week at a Glance */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <CardTitle className="text-xl">This Week at a Glance</CardTitle>
-              <CardDescription>{formatWeekDisplay(currentWeek)}</CardDescription>
+          {isPlanLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/calendar" className="gap-1">
-                View Full Calendar
+          ) : planError ? (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center text-destructive">
+              Failed to load meal plan. Please try again.
+            </div>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide snap-x snap-mandatory">
+              {todayMeals.map(({ mealType, planItem, recipe }) => (
+                <Link
+                  key={mealType}
+                  href="/calendar"
+                  className="snap-start shrink-0 w-[200px] sm:w-[240px]"
+                >
+                  <Card
+                    variant="interactive"
+                    className={cn(
+                      "h-full min-h-[140px]",
+                      !recipe && !planItem?.slotType && "border-dashed"
+                    )}
+                  >
+                    <CardHeader className="pb-2">
+                      <Badge variant="today" className="w-fit capitalize">
+                        {mealType}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent>
+                      {recipe ? (
+                        <>
+                          <p className="text-h3 font-display line-clamp-2">{recipe.title}</p>
+                          {(recipe.prepTimeMinutes || recipe.cookTimeMinutes) && (
+                            <div className="flex items-center gap-1 text-caption text-muted-foreground mt-2">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{(recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0)} min</span>
+                            </div>
+                          )}
+                        </>
+                      ) : planItem?.slotType && planItem.slotType !== 'recipe' ? (
+                        <p className="text-body text-muted-foreground capitalize">
+                          {planItem.slotType === 'dining_out' ? 'Dining Out' : planItem.slotType}
+                        </p>
+                      ) : (
+                        <p className="text-body text-muted-foreground italic">
+                          Not planned yet
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Quick Actions - Large Tappable Tiles */}
+        <section aria-labelledby="quick-actions-heading">
+          <h2 id="quick-actions-heading" className="text-h2 font-display mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {quickActionTiles.map((action) => {
+              const Icon = action.icon;
+              return (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-2 p-6 rounded-lg min-h-[120px] transition-all duration-200 ease-out",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    "active:scale-[0.98]",
+                    action.color
+                  )}
+                  style={{ minHeight: '120px' }}
+                >
+                  <Icon className="h-8 w-8" />
+                  <div className="text-center">
+                    <p className="text-body font-medium">{action.title}</p>
+                    <p className="text-caption text-inherit opacity-70">{action.description}</p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Week at a Glance - Simplified Visual Progress */}
+        <section aria-labelledby="week-overview-heading">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="text-h3 font-display">Week Overview</CardTitle>
+                <CardDescription>{formatWeekDisplay(currentWeek)}</CardDescription>
+              </div>
+              <Link
+                href="/calendar"
+                className="text-body-sm text-primary hover:text-primary-hover flex items-center gap-1 transition-colors"
+              >
+                Plan
                 <ChevronRight className="h-4 w-4" />
               </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {isPlanLoading && (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            )}
+            </CardHeader>
+            <CardContent>
+              {isPlanLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Progress Bar */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-body-sm">
+                      <span className="text-muted-foreground">
+                        {weekProgress.filled} of {weekProgress.total} meals planned
+                      </span>
+                      <span className="font-medium text-primary">{weekProgress.percentage}%</span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${weekProgress.percentage}%` }}
+                      />
+                    </div>
+                  </div>
 
-            {planError && (
-              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-center text-destructive">
-                Failed to load meal plan. Please try again.
-              </div>
-            )}
-
-            {!isPlanLoading && !planError && (
-              <div className="overflow-x-auto">
-                <div className="min-w-[600px]">
-                  {/* Day Headers */}
-                  <div className="grid grid-cols-7 gap-2 mb-3">
+                  {/* Day Summary - Visual Dots */}
+                  <div className="flex justify-between gap-1 pt-2">
                     {weekDates.map((date, index) => {
+                      const day = getDayOfWeek(date) as DayOfWeek;
                       const today = isToday(date);
-                      const tomorrow = isTomorrow(date);
+
+                      // Count filled slots for this day
+                      let filledCount = 0;
+                      for (const mealType of mealTypes) {
+                        const planItem = getPlanItem(day, mealType);
+                        if (planItem?.recipeId || (planItem?.slotType && planItem.slotType !== 'recipe')) {
+                          filledCount++;
+                        }
+                      }
+
+                      const isComplete = filledCount === mealTypes.length;
+                      const isPartial = filledCount > 0 && filledCount < mealTypes.length;
+
                       return (
                         <div
                           key={index}
                           className={cn(
-                            'text-center py-2 px-1 rounded-md',
-                            today && 'bg-primary text-primary-foreground',
-                            tomorrow && !today && 'bg-accent'
+                            "flex flex-col items-center gap-1.5 flex-1",
+                            today && "relative"
                           )}
                         >
-                          <div className="text-sm font-medium">{getDayName(date)}</div>
-                          <div className={cn(
-                            'text-xs',
-                            today ? 'text-primary-foreground' : 'text-muted-foreground'
+                          <span className={cn(
+                            "text-caption",
+                            today ? "font-semibold text-primary" : "text-muted-foreground"
                           )}>
-                            {formatDayNumber(date)}
+                            {getDayName(date).slice(0, 3)}
+                          </span>
+                          <div className={cn(
+                            "flex items-center justify-center w-8 h-8 rounded-full transition-colors",
+                            today && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                          )}>
+                            {isComplete ? (
+                              <CheckCircle2 className="h-5 w-5 text-secondary" />
+                            ) : isPartial ? (
+                              <div className="w-3 h-3 rounded-full bg-accent" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-muted-foreground/30" />
+                            )}
                           </div>
-                          {today && (
-                            <Badge variant="secondary" className="mt-1 text-xs">
-                              Today
-                            </Badge>
-                          )}
-                          {tomorrow && !today && (
-                            <Badge variant="outline" className="mt-1 text-xs">
-                              Tomorrow
-                            </Badge>
-                          )}
                         </div>
                       );
                     })}
                   </div>
-
-                  {/* Meal Rows */}
-                  {mealTypes.map((mealType) => (
-                    <div key={mealType} className="grid grid-cols-7 gap-2 mb-2">
-                      {weekDates.map((date, index) => {
-                        const day = getDayOfWeek(date) as DayOfWeek;
-                        const planItem = getPlanItem(day, mealType);
-                        const recipe = getRecipe(planItem);
-                        const today = isToday(date);
-                        const tomorrow = isTomorrow(date);
-                        const isHighlighted = today || tomorrow;
-
-                        return (
-                          <div
-                            key={`${day}-${mealType}`}
-                            className={cn(
-                              'rounded-md border p-2 min-h-[60px]',
-                              isHighlighted && 'border-primary/50 bg-primary/5',
-                              !recipe && 'border-dashed bg-muted/20'
-                            )}
-                          >
-                            <div className="text-xs text-muted-foreground capitalize mb-1">
-                              {mealType}
-                            </div>
-                            {recipe ? (
-                              <div className="text-sm font-medium line-clamp-2">
-                                {recipe.title}
-                              </div>
-                            ) : planItem?.slotType && planItem.slotType !== 'recipe' ? (
-                              <div className="text-sm text-muted-foreground capitalize">
-                                {planItem.slotType === 'dining_out' ? 'Dining Out' : planItem.slotType}
-                              </div>
-                            ) : (
-                              <div className="text-sm text-muted-foreground italic">
-                                Not planned
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Two Column Layout for Alerts and Recent Recipes */}
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Expiring Pantry Items Alert */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
-                <CardTitle className="text-lg">Expiring Soon</CardTitle>
-              </div>
-              <CardDescription>Pantry items expiring within 7 days</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {expiringItems.length > 0 ? (
-                <ul className="space-y-2">
-                  {expiringItems.map((item, index) => (
-                    <li
-                      key={index}
-                      className="flex items-center justify-between rounded-md border p-2"
-                    >
-                      <span className="font-medium">{item.name}</span>
-                      <Badge
-                        variant={item.daysLeft <= 2 ? "destructive" : "secondary"}
-                      >
-                        {item.daysLeft === 1
-                          ? "Expires tomorrow"
-                          : `${item.daysLeft} days left`}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
-                  <Package className="h-10 w-10 mb-2 opacity-50" />
-                  <p>No items expiring soon</p>
-                  <Button asChild variant="link" size="sm" className="mt-2">
-                    <Link href="/pantry">Manage Pantry</Link>
-                  </Button>
                 </div>
               )}
             </CardContent>
           </Card>
+        </section>
 
-          {/* Recently Added Recipes */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div>
-                <CardTitle className="text-lg">Recently Added</CardTitle>
-                <CardDescription>Your newest recipes</CardDescription>
-              </div>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/recipes" className="gap-1">
-                  View All
+        {/* Recently Added Recipes - Compact */}
+        {recentRecipes.length > 0 && (
+          <section aria-labelledby="recent-recipes-heading">
+            <Card variant="flat" className="bg-muted/30">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-h3 font-display">Recent Recipes</CardTitle>
+                <Link
+                  href="/recipes"
+                  className="text-body-sm text-primary hover:text-primary-hover flex items-center gap-1 transition-colors"
+                >
+                  View all
                   <ChevronRight className="h-4 w-4" />
                 </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {isRecipesLoading && (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              )}
-
-              {!isRecipesLoading && recentRecipes.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
-                  <UtensilsCrossed className="h-10 w-10 mb-2 opacity-50" />
-                  <p>No recipes yet</p>
-                  <Button asChild variant="link" size="sm" className="mt-2">
-                    <Link href="/recipes/new">Add your first recipe</Link>
-                  </Button>
-                </div>
-              )}
-
-              {!isRecipesLoading && recentRecipes.length > 0 && (
-                <ul className="space-y-2">
-                  {recentRecipes.slice(0, 4).map((recipe) => (
-                    <li key={recipe.id}>
-                      <Link
-                        href={`/recipes/${recipe.id}`}
-                        className="flex items-center justify-between rounded-md border p-2 hover:bg-accent transition-colors"
-                      >
-                        <span className="font-medium line-clamp-1">{recipe.title}</span>
-                        {(recipe.prepTimeMinutes || recipe.cookTimeMinutes) && (
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Clock className="h-4 w-4" />
-                            <span>
-                              {(recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0)} min
-                            </span>
-                          </div>
-                        )}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Navigation Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Link href="/calendar">
-            <Card className="h-full transition-colors hover:bg-accent">
-              <CardHeader>
-                <Calendar className="h-8 w-8 text-primary" />
-                <CardTitle className="mt-2">Meal Calendar</CardTitle>
-                <CardDescription>Plan your meals for the week</CardDescription>
               </CardHeader>
+              <CardContent>
+                {isRecipesLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <ul className="space-y-2">
+                    {recentRecipes.map((recipe) => (
+                      <li key={recipe.id}>
+                        <Link
+                          href={`/recipes/${recipe.id}`}
+                          className="flex items-center justify-between rounded-md p-3 min-h-[44px] hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <span className="text-body font-medium line-clamp-1">{recipe.title}</span>
+                          {(recipe.prepTimeMinutes || recipe.cookTimeMinutes) && (
+                            <div className="flex items-center gap-1 text-caption text-muted-foreground shrink-0 ml-2">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{(recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0)} min</span>
+                            </div>
+                          )}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
             </Card>
-          </Link>
-          <Link href="/recipes">
-            <Card className="h-full transition-colors hover:bg-accent">
-              <CardHeader>
-                <UtensilsCrossed className="h-8 w-8 text-primary" />
-                <CardTitle className="mt-2">Recipes</CardTitle>
-                <CardDescription>Browse your recipe collection</CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-          <Link href="/grocery">
-            <Card className="h-full transition-colors hover:bg-accent">
-              <CardHeader>
-                <ShoppingCart className="h-8 w-8 text-primary" />
-                <CardTitle className="mt-2">Grocery List</CardTitle>
-                <CardDescription>Manage your shopping list</CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-          <Link href="/pantry">
-            <Card className="h-full transition-colors hover:bg-accent">
-              <CardHeader>
-                <Package className="h-8 w-8 text-primary" />
-                <CardTitle className="mt-2">Pantry</CardTitle>
-                <CardDescription>Track your ingredients</CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-        </div>
+          </section>
+        )}
       </div>
     </div>
   );

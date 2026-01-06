@@ -1,9 +1,29 @@
 'use client';
 
 import * as React from 'react';
-import { Plus, AlertTriangle, ChefHat, Package, Refrigerator, Snowflake, Archive } from 'lucide-react';
+import {
+  Plus,
+  AlertTriangle,
+  ChefHat,
+  Package,
+  Refrigerator,
+  Snowflake,
+  Archive,
+  Leaf,
+  Beef,
+  Milk,
+  Wheat,
+  Flame,
+  Fish,
+  Croissant,
+  Droplets,
+  Cookie,
+  CircleDot,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import {
   Collapsible,
   CollapsibleContent,
@@ -21,6 +41,83 @@ import {
 import type { PantryItemWithIngredient, PantryLocation } from '@/types/api';
 import { PantryItem } from './PantryItem';
 import { PantryItemForm } from './PantryItemForm';
+
+/**
+ * Get the category icon component
+ */
+function getCategoryIconComponent(category: string): LucideIcon {
+  const categoryMap: Record<string, LucideIcon> = {
+    produce: Leaf,
+    dairy: Milk,
+    proteins: Beef,
+    meat: Beef,
+    protein: Beef,
+    seafood: Fish,
+    bakery: Croissant,
+    frozen: Snowflake,
+    pantry: Package,
+    canned: Package,
+    condiments: Droplets,
+    spices: Flame,
+    beverages: Droplets,
+    snacks: Cookie,
+    grains: Wheat,
+    pasta: Droplets,
+    oils: Droplets,
+    other: CircleDot,
+  };
+
+  const lower = category.toLowerCase();
+  return categoryMap[lower] || CircleDot;
+}
+
+/**
+ * Get the border color class for a category
+ */
+function getCategoryBorderColor(category: string): string {
+  const categoryMap: Record<string, string> = {
+    produce: 'border-l-category-produce',
+    dairy: 'border-l-category-dairy',
+    proteins: 'border-l-category-protein',
+    meat: 'border-l-category-protein',
+    protein: 'border-l-category-protein',
+    seafood: 'border-l-category-frozen',
+    frozen: 'border-l-category-frozen',
+    pantry: 'border-l-category-pantry',
+    canned: 'border-l-category-pantry',
+    spices: 'border-l-category-spices',
+    grains: 'border-l-category-grains',
+    bakery: 'border-l-category-grains',
+    pasta: 'border-l-category-grains',
+  };
+
+  const lower = category.toLowerCase();
+  return categoryMap[lower] || 'border-l-muted-foreground';
+}
+
+/**
+ * Get the icon color class for a category
+ */
+function getCategoryIconColor(category: string): string {
+  const categoryMap: Record<string, string> = {
+    produce: 'text-category-produce',
+    dairy: 'text-category-dairy',
+    proteins: 'text-category-protein',
+    meat: 'text-category-protein',
+    protein: 'text-category-protein',
+    seafood: 'text-category-frozen',
+    frozen: 'text-category-frozen',
+    pantry: 'text-category-pantry',
+    canned: 'text-category-pantry',
+    spices: 'text-category-spices',
+    grains: 'text-category-grains',
+    bakery: 'text-category-grains',
+    pasta: 'text-category-grains',
+  };
+
+  const lower = category.toLowerCase();
+  return categoryMap[lower] || 'text-muted-foreground';
+}
 
 type LocationFilter = 'all' | PantryLocation;
 
@@ -144,8 +241,8 @@ export function PantryListView({ className }: PantryListViewProps) {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Pantry</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-h1 font-display">Pantry</h1>
+          <p className="text-body-sm text-muted-foreground">
             Track your pantry inventory and available ingredients.
           </p>
         </div>
@@ -173,8 +270,10 @@ export function PantryListView({ className }: PantryListViewProps) {
           <button
             key={tab.value}
             onClick={() => setLocationFilter(tab.value)}
+            aria-pressed={locationFilter === tab.value}
+            aria-label={`Filter by ${tab.label}`}
             className={cn(
-              'flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px touch-manipulation min-h-[44px] whitespace-nowrap',
+              'flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px touch-manipulation min-h-[44px] whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
               locationFilter === tab.value
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted'
@@ -188,80 +287,80 @@ export function PantryListView({ className }: PantryListViewProps) {
 
       {/* Expiring Soon Alert Section */}
       {expiringItems.length > 0 && locationFilter === 'all' && (
-        <Collapsible
-          open={expiringOpen}
-          onOpenChange={setExpiringOpen}
-          className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20"
-        >
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              className="flex w-full items-center justify-between p-4 hover:bg-amber-100 dark:hover:bg-amber-900/20"
-            >
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                <span className="text-base font-semibold text-amber-700 dark:text-amber-300">
-                  Expiring Soon
+        <Card className="overflow-hidden border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+          <Collapsible open={expiringOpen} onOpenChange={setExpiringOpen}>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="flex w-full items-center justify-between p-4 hover:bg-amber-100 dark:hover:bg-amber-900/20 min-h-[56px]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-amber-200/50 dark:bg-amber-800/30">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <span className="text-base font-display font-semibold text-amber-700 dark:text-amber-300">
+                    Expiring Soon
+                  </span>
+                  <Badge variant="secondary" className="font-normal">
+                    {expiringItems.length} {expiringItems.length === 1 ? 'item' : 'items'}
+                  </Badge>
+                </div>
+                <span className="text-sm text-amber-600 dark:text-amber-400">
+                  {expiringOpen ? 'Hide' : 'Show'}
                 </span>
-                <Badge variant="secondary" className="font-normal">
-                  {expiringItems.length} {expiringItems.length === 1 ? 'item' : 'items'}
-                </Badge>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-4 pb-4">
+              <div className="flex flex-col gap-2">
+                {expiringItems.map((item) => (
+                  <PantryItem
+                    key={item.id}
+                    item={item}
+                    onEdit={handleEdit}
+                  />
+                ))}
               </div>
-              <span className="text-sm text-amber-600 dark:text-amber-400">
-                {expiringOpen ? 'Hide' : 'Show'}
-              </span>
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="px-4 pb-4">
-            <div className="flex flex-col gap-2">
-              {expiringItems.map((item) => (
-                <PantryItem
-                  key={item.id}
-                  item={item}
-                  onEdit={handleEdit}
-                />
-              ))}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
       )}
 
       {/* Prepared Items Section */}
       {preparedItems.length > 0 && (
-        <Collapsible
-          open={preparedOpen}
-          onOpenChange={setPreparedOpen}
-          className="rounded-lg border"
-        >
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              className="flex w-full items-center justify-between p-4 hover:bg-muted/50"
-            >
-              <div className="flex items-center gap-3">
-                <ChefHat className="h-5 w-5 text-muted-foreground" />
-                <span className="text-base font-semibold">Prepared Items</span>
-                <Badge variant="secondary" className="font-normal">
-                  {preparedItems.length} {preparedItems.length === 1 ? 'item' : 'items'}
-                </Badge>
+        <Card className="overflow-hidden">
+          <Collapsible open={preparedOpen} onOpenChange={setPreparedOpen}>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="flex w-full items-center justify-between p-4 hover:bg-muted/50 min-h-[56px]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/50 text-muted-foreground">
+                    <ChefHat className="h-5 w-5" />
+                  </div>
+                  <span className="text-base font-display font-semibold">Prepared Items</span>
+                  <Badge variant="secondary" className="font-normal">
+                    {preparedItems.length} {preparedItems.length === 1 ? 'item' : 'items'}
+                  </Badge>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {preparedOpen ? 'Hide' : 'Show'}
+                </span>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-4 pb-4">
+              <div className="flex flex-col gap-2">
+                {preparedItems.map((item) => (
+                  <PantryItem
+                    key={item.id}
+                    item={item}
+                    onEdit={handleEdit}
+                  />
+                ))}
               </div>
-              <span className="text-sm text-muted-foreground">
-                {preparedOpen ? 'Hide' : 'Show'}
-              </span>
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="px-4 pb-4">
-            <div className="flex flex-col gap-2">
-              {preparedItems.map((item) => (
-                <PantryItem
-                  key={item.id}
-                  item={item}
-                  onEdit={handleEdit}
-                />
-              ))}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
       )}
 
       {/* Loading state - Skeleton */}
@@ -277,38 +376,69 @@ export function PantryListView({ className }: PantryListViewProps) {
 
       {/* Empty state */}
       {!isLoading && !isError && items.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-          <Package className="h-12 w-12 text-muted-foreground/50" />
-          <h3 className="mt-4 text-lg font-semibold">No items in pantry</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Start tracking your pantry inventory by adding items.
+        <Card className="flex flex-col items-center justify-center py-12 px-6 text-center border-2 border-dashed bg-muted/30 shadow-none">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+            <Package className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-h3 font-display">Your pantry is empty</h3>
+          <p className="mt-2 text-body-sm text-muted-foreground max-w-sm">
+            Keep track of what you have on hand. Add ingredients to your pantry and we will help you skip items you already have when building grocery lists.
           </p>
-          <Button className="mt-4" onClick={() => setFormOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add First Item
-          </Button>
-        </div>
+          <div className="mt-6 flex flex-wrap gap-3 justify-center">
+            <Button onClick={() => setFormOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Add Your First Item
+            </Button>
+            {staples.length > 0 && (
+              <Button variant="outline" onClick={handleQuickAddStaples} disabled={addItem.isPending}>
+                Quick-add Staples
+              </Button>
+            )}
+          </div>
+        </Card>
       )}
 
       {/* Main items list by category */}
       {!isLoading && !isError && regularItems.length > 0 && (
-        <div className="space-y-6">
-          {Array.from(categorizedItems.entries()).map(([category, categoryItems]) => (
-            <div key={category}>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {category}
-              </h3>
-              <div className="flex flex-col gap-2">
-                {categoryItems.map((item) => (
-                  <PantryItem
-                    key={item.id}
-                    item={item}
-                    onEdit={handleEdit}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="space-y-4">
+          {Array.from(categorizedItems.entries()).map(([category, categoryItems]) => {
+            const IconComponent = getCategoryIconComponent(category);
+            const borderColor = getCategoryBorderColor(category);
+            const iconColor = getCategoryIconColor(category);
+
+            return (
+              <Card
+                key={category}
+                className={cn(
+                  'overflow-hidden border-l-4 transition-all duration-200',
+                  borderColor
+                )}
+              >
+                <div className="p-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/50', iconColor)}>
+                      <IconComponent className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-base font-display font-semibold uppercase tracking-wide">
+                      {category}
+                    </h3>
+                    <Badge variant="secondary" className="font-normal">
+                      {categoryItems.length} {categoryItems.length === 1 ? 'item' : 'items'}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {categoryItems.map((item) => (
+                      <PantryItem
+                        key={item.id}
+                        item={item}
+                        onEdit={handleEdit}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
 

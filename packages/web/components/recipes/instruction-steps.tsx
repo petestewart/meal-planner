@@ -79,6 +79,10 @@ function parseInstructions(instructions: string): ParsedStep[] {
  * Instruction steps component
  * Parses and displays recipe instructions with numbered steps
  * Supports section headers (lines starting with ##)
+ * Features:
+ * - Large, readable step numbers
+ * - Clear visual hierarchy with connecting line
+ * - Section headers for complex recipes
  */
 export function InstructionSteps({
   instructions,
@@ -94,34 +98,56 @@ export function InstructionSteps({
     );
   }
 
+  // Count only actual steps (not headers)
+  const totalSteps = steps.filter((s) => s.type === 'step').length;
+
   return (
     <div className={className}>
-      <h2 className="mb-3 text-lg font-semibold uppercase tracking-wide">
-        Instructions
-      </h2>
-      <div className="border-t border-border" />
-      <div className="mt-4 space-y-4">
-        {steps.map((step, index) => {
-          if (step.type === 'header') {
-            return (
-              <h3
-                key={`header-${index}`}
-                className="mt-6 text-base font-semibold uppercase tracking-wide text-muted-foreground"
-              >
-                {step.content}
-              </h3>
-            );
-          }
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="font-display text-xl font-semibold">
+          Instructions
+        </h2>
+        <span className="text-sm text-muted-foreground">
+          {totalSteps} {totalSteps === 1 ? 'step' : 'steps'}
+        </span>
+      </div>
 
-          return (
-            <div key={`step-${index}`} className="flex gap-4">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                {step.stepNumber}
+      <div className="relative">
+        {/* Vertical connecting line */}
+        <div className="absolute left-[18px] top-8 bottom-4 w-0.5 bg-border hidden sm:block" />
+
+        <div className="space-y-6">
+          {steps.map((step, index) => {
+            if (step.type === 'header') {
+              return (
+                <div key={`header-${index}`} className="relative">
+                  <h3 className="ml-12 sm:ml-14 text-sm font-semibold uppercase tracking-wider text-muted-foreground border-b border-border pb-2 mb-4 mt-4">
+                    {step.content}
+                  </h3>
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={`step-${index}`}
+                className="group relative flex gap-4 sm:gap-5"
+              >
+                {/* Step number circle */}
+                <div className="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-mono text-sm font-bold shadow-sm transition-transform group-hover:scale-110">
+                  {step.stepNumber}
+                </div>
+
+                {/* Step content */}
+                <div className="flex-1 pt-1.5 pb-2">
+                  <p className="leading-relaxed text-foreground/90">
+                    {step.content}
+                  </p>
+                </div>
               </div>
-              <p className="flex-1 pt-0.5 leading-relaxed">{step.content}</p>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );

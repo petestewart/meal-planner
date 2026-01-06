@@ -104,36 +104,75 @@ function IngredientItem({
     : null;
 
   return (
-    <li className="flex items-start gap-3 py-2">
+    <li
+      className={cn(
+        'group flex items-center gap-4 py-3 px-4 -mx-4 rounded-lg transition-colors cursor-pointer',
+        'hover:bg-muted/50',
+        checked && 'bg-muted/30'
+      )}
+      onClick={onToggle}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+    >
       <button
         type="button"
-        onClick={onToggle}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
         className={cn(
-          'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors',
+          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200',
           checked
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-muted-foreground/30 hover:border-primary'
+            ? 'border-primary bg-primary text-primary-foreground scale-100'
+            : 'border-muted-foreground/40 hover:border-primary group-hover:border-primary/60 scale-95 hover:scale-100'
         )}
         aria-label={checked ? 'Mark as not used' : 'Mark as used'}
       >
-        {checked && <Check className="h-3 w-3" />}
+        <Check className={cn(
+          'h-3.5 w-3.5 transition-all duration-200',
+          checked ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+        )} />
       </button>
-      <span className={cn('flex-1', checked && 'text-muted-foreground line-through')}>
-        {scaledQuantity !== null && (
-          <span className="font-medium">{formatQuantity(scaledQuantity)}</span>
+
+      <div className={cn(
+        'flex-1 flex items-baseline gap-2 transition-opacity duration-200',
+        checked && 'opacity-60'
+      )}>
+        {/* Quantity and unit */}
+        {(scaledQuantity !== null || ingredient.unit) && (
+          <span className={cn(
+            'font-mono text-sm font-semibold text-primary shrink-0',
+            checked && 'line-through decoration-muted-foreground/50'
+          )}>
+            {scaledQuantity !== null && formatQuantity(scaledQuantity)}
+            {ingredient.unit && ` ${ingredient.unit}`}
+          </span>
         )}
-        {ingredient.unit && (
-          <span className="font-medium"> {ingredient.unit}</span>
-        )}
-        {(scaledQuantity !== null || ingredient.unit) && ' '}
-        <span>{name}</span>
-        {ingredient.notes && name !== ingredient.notes && (
-          <span className="text-muted-foreground"> ({ingredient.notes})</span>
-        )}
+
+        {/* Ingredient name */}
+        <span className={cn(
+          'flex-1',
+          checked && 'line-through decoration-muted-foreground/50'
+        )}>
+          {name}
+          {ingredient.notes && name !== ingredient.notes && (
+            <span className="text-muted-foreground text-sm"> ({ingredient.notes})</span>
+          )}
+        </span>
+
+        {/* Optional badge */}
         {ingredient.optional && (
-          <span className="ml-1 text-xs text-muted-foreground">(optional)</span>
+          <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+            optional
+          </span>
         )}
-      </span>
+      </div>
     </li>
   );
 }
@@ -141,6 +180,10 @@ function IngredientItem({
 /**
  * Ingredient list component with quantities and checkboxes
  * Supports scaling based on servings adjustment
+ * Features:
+ * - Interactive checkbox items with hover states
+ * - Visual feedback when ingredients are checked off
+ * - Accessible keyboard navigation
  */
 export function IngredientList({
   ingredients,
@@ -162,6 +205,9 @@ export function IngredientList({
     });
   };
 
+  const checkedCount = checkedIds.size;
+  const totalCount = ingredients?.length || 0;
+
   if (!ingredients || ingredients.length === 0) {
     return (
       <div className={cn('text-muted-foreground italic', className)}>
@@ -172,11 +218,17 @@ export function IngredientList({
 
   return (
     <div className={className}>
-      <h2 className="mb-3 text-lg font-semibold uppercase tracking-wide">
-        Ingredients
-      </h2>
-      <div className="border-t border-border" />
-      <ul className="divide-y divide-border/50">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-display text-xl font-semibold">
+          Ingredients
+        </h2>
+        {checkedCount > 0 && (
+          <span className="text-sm text-muted-foreground">
+            {checkedCount} of {totalCount} checked
+          </span>
+        )}
+      </div>
+      <ul className="space-y-1">
         {ingredients.map((ingredient) => (
           <IngredientItem
             key={ingredient.id}

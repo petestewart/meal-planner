@@ -25,6 +25,7 @@ interface EmptyStateProps {
 
 /**
  * Reusable empty state component for lists/pages with no data
+ * Features a friendly, inviting design with clear CTAs
  */
 export function EmptyState({
   icon: Icon,
@@ -37,16 +38,18 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 p-12 text-center',
+        'flex flex-col items-center justify-center rounded-xl border-2 border-dashed bg-muted/30 py-12 px-6 text-center',
         className
       )}
     >
       {Icon && (
-        <Icon className="h-12 w-12 text-muted-foreground/50 mb-4" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+          <Icon className="h-8 w-8 text-muted-foreground" />
+        </div>
       )}
-      <h3 className="text-lg font-semibold">{title}</h3>
+      <h3 className="text-h3 font-display">{title}</h3>
       {description && (
-        <p className="mt-2 text-sm text-muted-foreground max-w-sm">
+        <p className="mt-2 text-body-sm text-muted-foreground max-w-sm">
           {description}
         </p>
       )}

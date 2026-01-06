@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { Plus, Download } from 'lucide-react';
+import { Plus, Download, X } from 'lucide-react';
 import { useRecipes } from '@/lib/queries';
 import { Button } from '@/components/ui/button';
 import {
@@ -101,6 +101,22 @@ export default function RecipesPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // Count of active filters for badge
+  const activeFilterCount = [
+    filters.search,
+    filters.cuisine,
+    filters.favorites,
+  ].filter(Boolean).length;
+
+  // Recipe count text
+  const recipeCountText = useMemo(() => {
+    if (isLoading) return '';
+    const total = data?.pagination?.total ?? sortedRecipes.length;
+    if (total === 0) return 'No recipes found';
+    if (total === 1) return '1 recipe';
+    return `${total} recipes`;
+  }, [isLoading, data?.pagination?.total, sortedRecipes.length]);
+
   return (
     <div className="container mx-auto p-6">
       {/* Header */}
@@ -132,8 +148,62 @@ export default function RecipesPage() {
         filters={filters}
         onFiltersChange={handleFiltersChange}
         cuisines={CUISINES}
-        className="mb-6"
+        className="mb-4"
       />
+
+      {/* Recipe count and active filters summary */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        {/* Recipe count */}
+        {recipeCountText && (
+          <span className="text-sm text-muted-foreground font-medium">
+            {recipeCountText}
+          </span>
+        )}
+
+        {/* Active filter chips */}
+        {activeFilterCount > 0 && (
+          <>
+            <span className="text-muted-foreground/50">|</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {filters.search && (
+                <FilterChip
+                  label={`"${filters.search}"`}
+                  onRemove={() =>
+                    handleFiltersChange({ ...filters, search: '' })
+                  }
+                />
+              )}
+              {filters.cuisine && (
+                <FilterChip
+                  label={
+                    filters.cuisine.charAt(0).toUpperCase() +
+                    filters.cuisine.slice(1)
+                  }
+                  onRemove={() =>
+                    handleFiltersChange({ ...filters, cuisine: '' })
+                  }
+                />
+              )}
+              {filters.favorites && (
+                <FilterChip
+                  label="Favorites"
+                  onRemove={() =>
+                    handleFiltersChange({ ...filters, favorites: false })
+                  }
+                />
+              )}
+              {activeFilterCount > 1 && (
+                <button
+                  onClick={() => handleFiltersChange(defaultFilters)}
+                  className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Error state */}
       {error && (
@@ -155,5 +225,28 @@ export default function RecipesPage() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Filter chip component for displaying active filters
+ */
+interface FilterChipProps {
+  label: string;
+  onRemove: () => void;
+}
+
+function FilterChip({ label, onRemove }: FilterChipProps) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary">
+      {label}
+      <button
+        onClick={onRemove}
+        className="ml-0.5 rounded-full p-1.5 min-h-[44px] min-w-[44px] -my-1 -mr-1.5 flex items-center justify-center hover:bg-primary/20 transition-colors touch-manipulation"
+        aria-label={`Remove ${label} filter`}
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </span>
   );
 }

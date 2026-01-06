@@ -147,15 +147,15 @@ function CalendarSkeleton() {
       {/* Week navigation skeleton */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Skeleton className="h-9 w-9" />
-          <Skeleton className="h-9 w-9" />
+          <Skeleton className="h-10 w-10" />
+          <Skeleton className="h-10 w-10" />
         </div>
         <Skeleton className="h-6 w-32" />
-        <Skeleton className="h-9 w-16" />
+        <Skeleton className="h-10 w-20" />
       </div>
 
-      {/* Calendar grid skeleton */}
-      <div className="space-y-4">
+      {/* Desktop Calendar grid skeleton - hidden on mobile */}
+      <div className="hidden md:block space-y-4">
         {/* Day headers */}
         <div className="grid grid-cols-[80px_repeat(7,1fr)] gap-1">
           <div />
@@ -178,6 +178,30 @@ function CalendarSkeleton() {
             ))}
           </div>
         ))}
+      </div>
+
+      {/* Mobile Calendar skeleton - shown on mobile only */}
+      <div className="md:hidden space-y-4">
+        {/* Horizontal date picker skeleton */}
+        <div className="flex gap-2 overflow-x-auto pb-3">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <Skeleton key={i} className="min-w-[52px] h-[66px] rounded-xl shrink-0" />
+          ))}
+        </div>
+
+        {/* Single day view skeleton */}
+        <div className="rounded-xl border p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-6 w-24" />
+            <Skeleton className="h-5 w-8" />
+          </div>
+          {[1, 2].map((meal) => (
+            <div key={meal} className="space-y-2">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="min-h-[80px] rounded-md" />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

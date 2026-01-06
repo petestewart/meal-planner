@@ -1,12 +1,141 @@
 'use client';
 
 import * as React from 'react';
-import { Check, ChevronDown, ChevronUp, X, ShoppingBag } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  X,
+  ShoppingBag,
+  Leaf,
+  Beef,
+  Milk,
+  Wheat,
+  Flame,
+  Snowflake,
+  Package,
+  Fish,
+  Croissant,
+  UtensilsCrossed,
+  Droplets,
+  Cookie,
+  CircleDot,
+  LucideIcon,
+  PartyPopper,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { GroceryItem as GroceryItemType, GroceryItemStatus } from '@/types/api';
 import { useUpdateGroceryItem } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+
+// ==================== Category Utilities ====================
+
+/**
+ * Get display name for category
+ */
+function getCategoryDisplayName(category: string): string {
+  const categoryMap: Record<string, string> = {
+    produce: 'Produce',
+    dairy: 'Dairy',
+    proteins: 'Proteins',
+    meat: 'Proteins',
+    protein: 'Proteins',
+    seafood: 'Seafood',
+    bakery: 'Bakery',
+    frozen: 'Frozen',
+    pantry: 'Pantry',
+    canned: 'Canned',
+    condiments: 'Condiments',
+    spices: 'Spices',
+    beverages: 'Beverages',
+    snacks: 'Snacks',
+    grains: 'Grains',
+    pasta: 'Pasta',
+    oils: 'Oils',
+    other: 'Other',
+  };
+
+  const lower = category.toLowerCase();
+  return categoryMap[lower] || category;
+}
+
+/**
+ * Get the category icon component
+ */
+function getCategoryIconComponent(category: string): LucideIcon {
+  const categoryMap: Record<string, LucideIcon> = {
+    produce: Leaf,
+    dairy: Milk,
+    proteins: Beef,
+    meat: Beef,
+    protein: Beef,
+    seafood: Fish,
+    bakery: Croissant,
+    frozen: Snowflake,
+    pantry: Package,
+    canned: Package,
+    condiments: Droplets,
+    spices: Flame,
+    beverages: Droplets,
+    snacks: Cookie,
+    grains: Wheat,
+    pasta: UtensilsCrossed,
+    oils: Droplets,
+    other: CircleDot,
+  };
+
+  const lower = category.toLowerCase();
+  return categoryMap[lower] || CircleDot;
+}
+
+/**
+ * Get the background color class for a category in shopping mode
+ */
+function getCategoryBgColor(category: string): string {
+  const categoryMap: Record<string, string> = {
+    produce: 'bg-category-produce/20',
+    dairy: 'bg-category-dairy/30',
+    proteins: 'bg-category-protein/20',
+    meat: 'bg-category-protein/20',
+    protein: 'bg-category-protein/20',
+    seafood: 'bg-category-frozen/20',
+    frozen: 'bg-category-frozen/20',
+    pantry: 'bg-category-pantry/20',
+    canned: 'bg-category-pantry/20',
+    spices: 'bg-category-spices/20',
+    grains: 'bg-category-grains/20',
+    bakery: 'bg-category-grains/20',
+    pasta: 'bg-category-grains/20',
+  };
+
+  const lower = category.toLowerCase();
+  return categoryMap[lower] || 'bg-muted/30';
+}
+
+/**
+ * Get the icon color class for a category
+ */
+function getCategoryIconColor(category: string): string {
+  const categoryMap: Record<string, string> = {
+    produce: 'text-category-produce',
+    dairy: 'text-category-dairy',
+    proteins: 'text-category-protein',
+    meat: 'text-category-protein',
+    protein: 'text-category-protein',
+    seafood: 'text-category-frozen',
+    frozen: 'text-category-frozen',
+    pantry: 'text-category-pantry',
+    canned: 'text-category-pantry',
+    spices: 'text-category-spices',
+    grains: 'text-category-grains',
+    bakery: 'text-category-grains',
+    pasta: 'text-category-grains',
+  };
+
+  const lower = category.toLowerCase();
+  return categoryMap[lower] || 'text-muted-foreground';
+}
 
 // ==================== Shopping Mode Item ====================
 
@@ -31,16 +160,23 @@ function formatQuantity(quantity: number | null, unit: string | null): string {
 }
 
 /**
- * Shopping mode item with large touch target and simple check/uncheck
+ * Shopping mode item with extra-large touch target and high-contrast design
  * Optimized for in-store use on mobile devices
  */
 export function ShoppingItem({ item, week }: ShoppingItemProps) {
   const updateItem = useUpdateGroceryItem();
+  const [justChecked, setJustChecked] = React.useState(false);
 
   const handleToggle = () => {
     // Simple toggle between need_to_buy and already_have
     const nextStatus: GroceryItemStatus =
       item.status === 'already_have' ? 'need_to_buy' : 'already_have';
+
+    // Trigger check animation when checking off
+    if (nextStatus === 'already_have') {
+      setJustChecked(true);
+      setTimeout(() => setJustChecked(false), 500);
+    }
 
     updateItem.mutate({
       week,
@@ -60,49 +196,51 @@ export function ShoppingItem({ item, week }: ShoppingItemProps) {
       onClick={handleToggle}
       disabled={updateItem.isPending}
       className={cn(
-        // Large touch target (minimum 44px, using 56px for comfort)
-        'flex w-full items-center gap-4 rounded-xl p-4 min-h-[56px]',
+        // Extra-large touch target (minimum 64px for in-store use)
+        'flex w-full items-center gap-5 rounded-2xl p-5 min-h-[72px]',
         'transition-all duration-200 ease-out',
-        'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+        'focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2',
         'disabled:cursor-not-allowed disabled:opacity-50',
         'active:scale-[0.98]',
         isChecked
-          ? 'bg-muted/80 border-2 border-transparent'
-          : 'bg-card border-2 border-border shadow-sm hover:border-primary/30'
+          ? 'bg-success/15 border-3 border-success/40'
+          : 'bg-card border-3 border-border shadow-md hover:border-primary/50 hover:shadow-lg'
       )}
       aria-label={`${isChecked ? 'Uncheck' : 'Check'} ${item.name}`}
     >
-      {/* Large checkbox */}
+      {/* Extra-large checkbox (40px) for easy touch */}
       <div
         className={cn(
-          // Large checkbox for easy touch (28px)
-          'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 transition-colors',
+          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-3 transition-all duration-200',
           isChecked
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-muted-foreground/40 bg-background'
+            ? 'border-success bg-success text-success-foreground'
+            : 'border-muted-foreground/50 bg-background',
+          justChecked && 'animate-check-bounce'
         )}
       >
-        {isChecked && <Check className="h-5 w-5" strokeWidth={3} />}
+        {isChecked && <Check className="h-7 w-7" strokeWidth={3} />}
       </div>
 
-      {/* Item content */}
+      {/* Item content - larger text */}
       <div className="flex-1 text-left">
         <span
           className={cn(
-            'text-lg font-medium leading-tight',
-            isChecked && 'text-muted-foreground line-through'
+            'text-xl font-semibold leading-tight',
+            isChecked && 'text-success line-through decoration-2'
           )}
         >
           {item.name}
         </span>
       </div>
 
-      {/* Quantity */}
+      {/* Quantity - larger and more prominent */}
       {item.quantity !== null && (
         <span
           className={cn(
-            'shrink-0 text-base font-medium tabular-nums',
-            isChecked ? 'text-muted-foreground' : 'text-foreground'
+            'shrink-0 text-lg font-bold tabular-nums px-3 py-1 rounded-lg',
+            isChecked
+              ? 'text-success/70 bg-success/10'
+              : 'text-foreground bg-muted/50'
           )}
         >
           {formatQuantity(item.quantity, item.unit)}
@@ -122,36 +260,8 @@ interface ShoppingCategoryProps {
 }
 
 /**
- * Get display name for category
- */
-function getCategoryDisplayName(category: string): string {
-  const categoryMap: Record<string, string> = {
-    produce: 'Produce',
-    dairy: 'Dairy',
-    proteins: 'Proteins',
-    meat: 'Proteins',
-    seafood: 'Seafood',
-    bakery: 'Bakery',
-    frozen: 'Frozen',
-    pantry: 'Pantry',
-    canned: 'Canned',
-    condiments: 'Condiments',
-    spices: 'Spices',
-    beverages: 'Beverages',
-    snacks: 'Snacks',
-    grains: 'Grains',
-    pasta: 'Pasta',
-    oils: 'Oils',
-    other: 'Other',
-  };
-
-  const lower = category.toLowerCase();
-  return categoryMap[lower] || category;
-}
-
-/**
  * Collapsible category section for shopping mode
- * Large header for easy tap to collapse/expand
+ * Features category icons and colors for easy identification
  */
 export function ShoppingCategory({
   category,
@@ -162,8 +272,10 @@ export function ShoppingCategory({
   const [isOpen, setIsOpen] = React.useState(defaultOpen);
 
   const displayName = getCategoryDisplayName(category);
+  const IconComponent = getCategoryIconComponent(category);
+  const bgColor = getCategoryBgColor(category);
+  const iconColor = getCategoryIconColor(category);
   const uncheckedCount = items.filter((i) => i.status !== 'already_have').length;
-  const totalCount = items.length;
 
   // Only show items that need to be bought (filter out already_have)
   const activeItems = items.filter((i) => i.status !== 'already_have');
@@ -174,31 +286,36 @@ export function ShoppingCategory({
   }
 
   return (
-    <div className="rounded-xl overflow-hidden" id={`category-${category.toLowerCase()}`}>
-      {/* Category header - large touch target */}
+    <div className="rounded-2xl overflow-hidden shadow-md" id={`category-${category.toLowerCase()}`}>
+      {/* Category header - large touch target with icon */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'flex w-full items-center justify-between p-4 min-h-[52px]',
-          'bg-muted/50 hover:bg-muted/70 transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary'
+          'flex w-full items-center justify-between p-5 min-h-[64px]',
+          bgColor,
+          'hover:brightness-95 transition-all duration-200',
+          'focus:outline-none focus:ring-4 focus:ring-inset focus:ring-primary/50'
         )}
         aria-expanded={isOpen}
         aria-controls={`category-content-${category}`}
       >
-        <div className="flex items-center gap-3">
-          <span className="text-lg font-bold uppercase tracking-wide">
+        <div className="flex items-center gap-4">
+          {/* Category Icon */}
+          <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-background/80', iconColor)}>
+            <IconComponent className="h-7 w-7" />
+          </div>
+          <span className="text-xl font-bold uppercase tracking-wide">
             {displayName}
           </span>
-          <Badge variant="secondary" className="text-sm font-semibold">
+          <Badge variant="secondary" className="text-base font-bold px-3 py-1">
             {uncheckedCount}
           </Badge>
         </div>
         {isOpen ? (
-          <ChevronUp className="h-6 w-6 text-muted-foreground" />
+          <ChevronUp className="h-8 w-8 text-muted-foreground" />
         ) : (
-          <ChevronDown className="h-6 w-6 text-muted-foreground" />
+          <ChevronDown className="h-8 w-8 text-muted-foreground" />
         )}
       </button>
 
@@ -206,13 +323,77 @@ export function ShoppingCategory({
       {isOpen && (
         <div
           id={`category-content-${category}`}
-          className="flex flex-col gap-2 p-2 bg-background"
+          className="flex flex-col gap-3 p-4 bg-background/50"
         >
           {activeItems.map((item) => (
             <ShoppingItem key={item.id} item={item} week={week} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ==================== Celebration Animation ====================
+
+interface ConfettiProps {
+  show: boolean;
+}
+
+/**
+ * Confetti celebration animation component
+ */
+function Confetti({ show }: ConfettiProps) {
+  const [particles, setParticles] = React.useState<Array<{
+    id: number;
+    x: number;
+    delay: number;
+    color: string;
+    size: number;
+  }>>([]);
+
+  React.useEffect(() => {
+    if (show) {
+      const colors = [
+        'bg-success',
+        'bg-primary',
+        'bg-accent',
+        'bg-category-produce',
+        'bg-category-protein',
+        'bg-category-dairy',
+      ];
+      const newParticles = Array.from({ length: 50 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        delay: Math.random() * 0.5,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: Math.random() * 8 + 4,
+      }));
+      setParticles(newParticles);
+    } else {
+      setParticles([]);
+    }
+  }, [show]);
+
+  if (!show || particles.length === 0) return null;
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[60] overflow-hidden">
+      {particles.map((particle) => (
+        <div
+          key={particle.id}
+          className={cn(
+            particle.color,
+            'absolute rounded-full animate-confetti-fall'
+          )}
+          style={{
+            left: `${particle.x}%`,
+            width: `${particle.size}px`,
+            height: `${particle.size}px`,
+            animationDelay: `${particle.delay}s`,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -312,15 +493,17 @@ function useWakeLock() {
 /**
  * Shopping mode view optimized for in-store use
  * Features:
- * - Large touch targets (44px minimum)
- * - Simplified UI (no filters/search)
- * - Hide "already have" items
- * - Category collapse/expand
+ * - Full-screen high-contrast mode
+ * - Extra-large touch targets (64px+ items, 40px checkboxes)
+ * - Large text (xl/2xl) for easy reading
+ * - Category icons and colors for quick navigation
  * - Wake lock to keep screen on
- * - Quick category jump
+ * - Celebration animation on completion
  */
 export function ShoppingModeView({ items, week, onExit }: ShoppingModeViewProps) {
   const wakeLock = useWakeLock();
+  const [showCelebration, setShowCelebration] = React.useState(false);
+  const [hasShownCelebration, setHasShownCelebration] = React.useState(false);
 
   // Request wake lock when component mounts
   React.useEffect(() => {
@@ -355,6 +538,17 @@ export function ShoppingModeView({ items, week, onExit }: ShoppingModeViewProps)
   const totalItems = items.length;
   const checkedItems = items.filter((i) => i.status === 'already_have').length;
   const remainingItems = totalItems - checkedItems;
+  const progressPercent = totalItems > 0 ? (checkedItems / totalItems) * 100 : 0;
+
+  // Trigger celebration when all items are checked
+  React.useEffect(() => {
+    if (remainingItems === 0 && totalItems > 0 && !hasShownCelebration) {
+      setShowCelebration(true);
+      setHasShownCelebration(true);
+      // Hide confetti after animation
+      setTimeout(() => setShowCelebration(false), 3500);
+    }
+  }, [remainingItems, totalItems, hasShownCelebration]);
 
   // Scroll to category
   const scrollToCategory = (category: string) => {
@@ -366,14 +560,19 @@ export function ShoppingModeView({ items, week, onExit }: ShoppingModeViewProps)
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
-      {/* Header - sticky */}
-      <div className="sticky top-0 z-10 bg-background border-b shadow-sm">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
-            <ShoppingBag className="h-6 w-6 text-primary" />
+      {/* Confetti celebration */}
+      <Confetti show={showCelebration} />
+
+      {/* Header - sticky with high contrast */}
+      <div className="sticky top-0 z-10 bg-card border-b-2 border-border shadow-lg">
+        <div className="flex items-center justify-between p-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+              <ShoppingBag className="h-8 w-8 text-primary" />
+            </div>
             <div>
-              <h1 className="text-xl font-bold">Shopping Mode</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-2xl font-bold">Shopping Mode</h1>
+              <p className="text-lg text-muted-foreground font-medium">
                 {remainingItems} of {totalItems} remaining
               </p>
             </div>
@@ -383,42 +582,49 @@ export function ShoppingModeView({ items, week, onExit }: ShoppingModeViewProps)
             variant="ghost"
             size="icon"
             onClick={onExit}
-            className="h-12 w-12"
+            className="h-14 w-14 rounded-2xl hover:bg-destructive/10"
             aria-label="Exit shopping mode"
           >
-            <X className="h-6 w-6" />
+            <X className="h-8 w-8" />
           </Button>
         </div>
 
-        {/* Progress bar */}
-        <div className="h-1.5 bg-muted">
+        {/* Progress bar - larger and more visible */}
+        <div className="h-3 bg-muted">
           <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${totalItems > 0 ? (checkedItems / totalItems) * 100 : 0}%` }}
+            className={cn(
+              'h-full transition-all duration-500 ease-out',
+              progressPercent === 100 ? 'bg-success' : 'bg-primary'
+            )}
+            style={{ width: `${progressPercent}%` }}
           />
         </div>
 
-        {/* Quick category jump - horizontal scroll */}
+        {/* Quick category jump - horizontal scroll with icons */}
         {sortedCategories.length > 1 && (
-          <div className="flex gap-2 p-3 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-3 p-4 overflow-x-auto scrollbar-hide bg-muted/30">
             {sortedCategories.map(([category, categoryItems]) => {
               const uncheckedCount = categoryItems.filter(
                 (i) => i.status !== 'already_have'
               ).length;
               if (uncheckedCount === 0) return null;
+              const IconComponent = getCategoryIconComponent(category);
+              const iconColor = getCategoryIconColor(category);
               return (
                 <button
                   key={category}
                   onClick={() => scrollToCategory(category)}
                   className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-full',
-                    'bg-muted hover:bg-muted/80 transition-colors',
-                    'text-sm font-medium whitespace-nowrap',
-                    'focus:outline-none focus:ring-2 focus:ring-primary'
+                    'flex items-center gap-3 px-4 py-3 rounded-xl',
+                    'bg-card hover:bg-card/80 transition-colors shadow-sm',
+                    'text-base font-semibold whitespace-nowrap',
+                    'focus:outline-none focus:ring-4 focus:ring-primary/50',
+                    'min-h-[52px]'
                   )}
                 >
+                  <IconComponent className={cn('h-6 w-6', iconColor)} />
                   {getCategoryDisplayName(category)}
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-sm font-bold">
                     {uncheckedCount}
                   </Badge>
                 </button>
@@ -429,26 +635,35 @@ export function ShoppingModeView({ items, week, onExit }: ShoppingModeViewProps)
       </div>
 
       {/* Main content - scrollable */}
-      <div className="flex-1 overflow-y-auto pb-24">
+      <div className="flex-1 overflow-y-auto pb-28">
         {remainingItems === 0 ? (
-          // All done state
+          // All done state with celebration
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-            <div className="rounded-full bg-green-100 dark:bg-green-900/30 p-6 mb-6">
-              <Check className="h-16 w-16 text-green-600 dark:text-green-400" />
+            <div className={cn(
+              'rounded-full bg-success/20 p-8 mb-8',
+              showCelebration && 'animate-celebration-burst'
+            )}>
+              <div className="rounded-full bg-success/30 p-6">
+                <Check className="h-20 w-20 text-success animate-check-bounce" strokeWidth={3} />
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-green-700 dark:text-green-400 mb-2">
-              Shopping Complete!
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              You got all {totalItems} items.
+            <div className="flex items-center gap-3 mb-4">
+              <PartyPopper className="h-10 w-10 text-accent" />
+              <h2 className="text-3xl font-bold text-success">
+                Shopping Complete!
+              </h2>
+              <PartyPopper className="h-10 w-10 text-accent scale-x-[-1]" />
+            </div>
+            <p className="text-xl text-muted-foreground mb-10">
+              You got all {totalItems} items. Great job!
             </p>
-            <Button size="lg" onClick={onExit} className="min-w-[200px]">
+            <Button size="lg" onClick={onExit} className="min-w-[240px] h-16 text-xl font-bold rounded-2xl">
               Done Shopping
             </Button>
           </div>
         ) : (
           // Category list
-          <div className="flex flex-col gap-3 p-4">
+          <div className="flex flex-col gap-4 p-5">
             {sortedCategories.map(([category, categoryItems]) => (
               <ShoppingCategory
                 key={category}
@@ -462,14 +677,14 @@ export function ShoppingModeView({ items, week, onExit }: ShoppingModeViewProps)
         )}
       </div>
 
-      {/* Done Shopping button - fixed at bottom */}
+      {/* Done Shopping button - fixed at bottom with high contrast */}
       {remainingItems > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg">
+        <div className="fixed bottom-0 left-0 right-0 p-5 bg-card border-t-2 border-border shadow-xl safe-area-inset-bottom">
           <Button
             size="lg"
             onClick={onExit}
             variant="outline"
-            className="w-full h-14 text-lg font-semibold"
+            className="w-full h-16 text-xl font-bold rounded-2xl border-2"
           >
             Exit Shopping Mode
           </Button>

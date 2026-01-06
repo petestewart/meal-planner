@@ -4,48 +4,163 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Typography - Font Families */
+    --font-display: "Fraunces", Georgia, serif;
+    --font-body: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+
+    /* Typography - Type Scale */
+    --text-display: 2.25rem;      /* 36px */
+    --text-display-lh: 1.1;
+    --text-h1: 1.75rem;           /* 28px */
+    --text-h1-lh: 1.2;
+    --text-h2: 1.375rem;          /* 22px */
+    --text-h2-lh: 1.25;
+    --text-h3: 1.125rem;          /* 18px */
+    --text-h3-lh: 1.3;
+    --text-body: 1rem;            /* 16px */
+    --text-body-lh: 1.5;
+    --text-body-sm: 0.875rem;     /* 14px */
+    --text-body-sm-lh: 1.5;
+    --text-caption: 0.75rem;      /* 12px */
+    --text-caption-lh: 1.4;
+    --text-overline: 0.6875rem;   /* 11px */
+    --text-overline-lh: 1.3;
+
+    /* Primary Palette - Light Mode */
+    --background: 42 33% 98%;
+    --foreground: 30 25% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 30 25% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --popover-foreground: 30 25% 12%;
+
+    /* Accent Colors */
+    --primary: 24 85% 55%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 24 85% 48%;
+    --secondary: 142 45% 45%;
+    --secondary-foreground: 0 0% 100%;
+    --accent: 45 93% 65%;
+    --accent-foreground: 30 25% 12%;
+    --muted: 42 20% 94%;
+    --muted-foreground: 30 15% 45%;
+
+    /* Semantic Colors */
+    --success: 142 50% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 95% 60%;
+    --warning-foreground: 30 25% 12%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --info: 200 70% 50%;
+    --info-foreground: 0 0% 100%;
+
+    /* UI Colors */
+    --border: 42 20% 88%;
+    --input: 42 20% 88%;
+    --ring: 24 85% 55%;
     --radius: 0.5rem;
+
+    /* Category Colors */
+    --category-produce: 142 55% 45%;
+    --category-protein: 0 60% 55%;
+    --category-dairy: 45 70% 80%;
+    --category-grains: 35 70% 55%;
+    --category-spices: 15 80% 50%;
+    --category-frozen: 200 60% 60%;
+    --category-pantry: 30 35% 50%;
+
+    /* Spacing Scale */
+    --space-1: 4px;    /* Tight: icon gaps */
+    --space-2: 8px;    /* Dense: inline elements */
+    --space-3: 12px;   /* Compact: list items */
+    --space-4: 16px;   /* Default: card padding */
+    --space-5: 20px;   /* Comfortable: section gaps */
+    --space-6: 24px;   /* Relaxed: major sections */
+    --space-8: 32px;   /* Generous: page sections */
+    --space-10: 40px;  /* Expansive: page margins */
+    --space-12: 48px;  /* Hero: large gaps */
+
+    /* Border Radius */
+    --radius-sm: 6px;      /* Buttons, inputs */
+    --radius-md: 10px;     /* Cards, containers */
+    --radius-lg: 16px;     /* Large cards, modals */
+    --radius-xl: 24px;     /* Feature cards */
+    --radius-full: 9999px; /* Pills, avatars */
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px hsla(30, 25%, 12%, 0.05);
+    --shadow-md: 0 4px 12px hsla(30, 25%, 12%, 0.08),
+                 0 1px 3px hsla(30, 25%, 12%, 0.05);
+    --shadow-lg: 0 8px 24px hsla(30, 25%, 12%, 0.1),
+                 0 2px 8px hsla(30, 25%, 12%, 0.06);
+    --shadow-xl: 0 16px 48px hsla(30, 25%, 12%, 0.12),
+                 0 4px 16px hsla(30, 25%, 12%, 0.08);
+    --shadow-drag: 0 20px 40px hsla(30, 25%, 12%, 0.15),
+                   0 8px 16px hsla(30, 25%, 12%, 0.1);
+
+    /* Timing Functions */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    /* Primary Palette - Dark Mode */
+    --background: 30 15% 10%;
+    --foreground: 42 20% 92%;
+    --card: 30 12% 14%;
+    --card-foreground: 42 20% 92%;
+    --popover: 30 12% 14%;
+    --popover-foreground: 42 20% 92%;
+
+    /* Accent Colors - Dark Mode (adjusted for WCAG AA contrast) */
+    --primary: 24 90% 62%;           /* Lighter terracotta for better contrast */
+    --primary-foreground: 30 15% 10%;  /* Dark text on primary for contrast */
+    --primary-hover: 24 90% 68%;     /* Lighter hover state */
+    --secondary: 142 50% 52%;        /* Slightly brighter green */
+    --secondary-foreground: 30 15% 10%;
+    --accent: 45 93% 68%;            /* Slightly brighter amber */
+    --accent-foreground: 30 25% 10%;
+    --muted: 30 12% 18%;
+    --muted-foreground: 42 15% 65%;  /* Brighter for better contrast (5.5:1) */
+
+    /* Semantic Colors - Dark Mode (adjusted for contrast) */
+    --success: 142 55% 52%;          /* Brighter green */
+    --success-foreground: 30 15% 10%;
+    --warning: 38 95% 62%;           /* Slightly adjusted */
+    --warning-foreground: 30 25% 10%;
+    --destructive: 0 72% 60%;        /* Slightly brighter red */
+    --destructive-foreground: 0 0% 100%;
+    --info: 200 70% 58%;             /* Brighter blue */
+    --info-foreground: 30 15% 10%;
+
+    /* UI Colors - Dark Mode (improved border visibility) */
+    --border: 30 12% 28%;            /* Lighter border for better visibility (3:1) */
+    --input: 30 12% 28%;
+    --ring: 24 90% 62%;
+
+    /* Category Colors - Dark Mode (adjusted for visibility and contrast) */
+    --category-produce: 142 55% 55%;
+    --category-protein: 0 60% 62%;
+    --category-dairy: 45 70% 78%;
+    --category-grains: 35 70% 62%;
+    --category-spices: 15 80% 60%;
+    --category-frozen: 200 60% 68%;
+    --category-pantry: 30 40% 60%;
+
+    /* Shadows - Dark Mode (subtle glow for visibility on dark backgrounds) */
+    --shadow-sm: 0 1px 2px hsla(30, 20%, 5%, 0.4),
+                 0 1px 3px hsla(24, 90%, 62%, 0.05);
+    --shadow-md: 0 4px 12px hsla(30, 20%, 5%, 0.5),
+                 0 1px 3px hsla(24, 90%, 62%, 0.08);
+    --shadow-lg: 0 8px 24px hsla(30, 20%, 5%, 0.6),
+                 0 2px 8px hsla(24, 90%, 62%, 0.1);
+    --shadow-xl: 0 16px 48px hsla(30, 20%, 5%, 0.7),
+                 0 4px 16px hsla(24, 90%, 62%, 0.12);
+    --shadow-drag: 0 20px 40px hsla(30, 20%, 5%, 0.7),
+                   0 8px 16px hsla(24, 90%, 62%, 0.15);
   }
 }
 
@@ -55,5 +170,261 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+}
+
+/* Typography Utility Classes */
+@layer utilities {
+  .text-display {
+    font-family: var(--font-display);
+    font-size: var(--text-display);
+    line-height: var(--text-display-lh);
+    font-weight: 700;
+  }
+
+  .text-h1 {
+    font-family: var(--font-display);
+    font-size: var(--text-h1);
+    line-height: var(--text-h1-lh);
+    font-weight: 600;
+  }
+
+  .text-h2 {
+    font-family: var(--font-display);
+    font-size: var(--text-h2);
+    line-height: var(--text-h2-lh);
+    font-weight: 600;
+  }
+
+  .text-h3 {
+    font-family: var(--font-display);
+    font-size: var(--text-h3);
+    line-height: var(--text-h3-lh);
+    font-weight: 600;
+  }
+
+  .text-body {
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: var(--text-body-lh);
+    font-weight: 400;
+  }
+
+  .text-body-sm {
+    font-family: var(--font-body);
+    font-size: var(--text-body-sm);
+    line-height: var(--text-body-sm-lh);
+    font-weight: 400;
+  }
+
+  .text-caption {
+    font-family: var(--font-body);
+    font-size: var(--text-caption);
+    line-height: var(--text-caption-lh);
+    font-weight: 500;
+  }
+
+  .text-overline {
+    font-family: var(--font-body);
+    font-size: var(--text-overline);
+    line-height: var(--text-overline-lh);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-body {
+    font-family: var(--font-body);
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* Safe Area Inset for Mobile Navigation */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Hide scrollbar but keep scroll functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Spring timing function utility */
+  .ease-spring {
+    transition-timing-function: var(--spring);
+  }
+
+  /* Shimmer Animation for Loading Skeletons */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--muted-foreground) / 0.1) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+}
+
+/* ============================================
+   Page Transitions
+   ============================================
+   Smooth fade + slide transitions between routes.
+   Uses CSS animations for performance and reliability.
+   View Transitions API provides enhanced cross-fade where supported.
+*/
+
+/* Page enter animation keyframes */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Page transition wrapper */
+.page-transition {
+  animation: page-enter 150ms var(--ease-out) both;
+  /* Prevent layout shift during animation by using will-change */
+  will-change: opacity, transform;
+  /* Ensure the element doesn't affect layout during transform */
+  transform-origin: top center;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .page-transition {
+    animation: none;
+  }
+}
+
+/* ============================================
+   View Transitions API Support
+   ============================================
+   Enhanced page transitions for browsers that support
+   the View Transitions API. Provides smoother cross-fade
+   between old and new page states.
+*/
+
+/* Enable view transitions on the root */
+@supports (view-transition-name: none) {
+  :root {
+    view-transition-name: none;
+  }
+
+  /* Main content area gets view transition treatment */
+  #main-content {
+    view-transition-name: main-content;
+  }
+
+  /* Old page fades out */
+  ::view-transition-old(main-content) {
+    animation: 150ms var(--ease-out) both fade-out;
+  }
+
+  /* New page fades in with subtle slide */
+  ::view-transition-new(main-content) {
+    animation: 150ms var(--ease-out) both fade-slide-in;
+  }
+
+  @keyframes fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes fade-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Disable view transitions for reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(main-content),
+    ::view-transition-new(main-content) {
+      animation: none;
+    }
+  }
+}
+
+/* ============================================
+   Reduced Motion Preferences
+   ============================================
+   Comprehensive support for users who prefer reduced motion.
+   Disables or minimizes animations while preserving essential
+   visual feedback for interactions.
+*/
+
+@media (prefers-reduced-motion: reduce) {
+  /* Disable all animations globally */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Ensure spring timing falls back to standard easing */
+  .ease-spring {
+    transition-timing-function: ease !important;
+  }
+
+  /* Disable specific micro-interaction animations */
+  .animate-shimmer,
+  .animate-check-bounce,
+  .animate-favorite-pop,
+  .animate-celebration-burst,
+  .animate-confetti-fall,
+  .animate-pulse-subtle {
+    animation: none !important;
+  }
+
+  /* Disable transform-based hover effects */
+  button:hover,
+  [role="button"]:hover,
+  a:hover {
+    transform: none !important;
+  }
+
+  /* Preserve essential visual states without motion */
+  button:active,
+  [role="button"]:active {
+    opacity: 0.8;
   }
 }

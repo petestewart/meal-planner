@@ -1,9 +1,33 @@
 import type { Metadata, Viewport } from "next";
+import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { Header, Navigation, MobileNav } from "@/components/layout";
 import { OfflineIndicator } from "@/components/ui/offline-indicator";
 import "./globals.css";
+
+// Display font for headings and branding
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+// Body font for text and UI elements
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+// Mono font for times, quantities, and numbers
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Meal Planner",
@@ -33,8 +57,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-background font-sans antialiased">
+    <html lang="en" suppressHydrationWarning className={`${fraunces.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}>
+      <body className="min-h-screen bg-background font-body antialiased">
         <QueryProvider>
           <ThemeProvider
             attribute="class"

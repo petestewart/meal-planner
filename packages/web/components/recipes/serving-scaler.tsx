@@ -78,7 +78,8 @@ export function ServingScaler({
         <button
           type="button"
           onClick={() => onServingsChange(originalServings)}
-          className="text-xs text-muted-foreground hover:text-foreground underline"
+          className="text-xs text-muted-foreground hover:text-foreground underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          aria-label={`Reset servings to ${originalServings}`}
         >
           Reset
         </button>

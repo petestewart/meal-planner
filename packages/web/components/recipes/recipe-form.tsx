@@ -373,16 +373,16 @@ export function RecipeForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className={cn('space-y-6', className)}>
+    <form onSubmit={handleSubmit} className={cn('space-y-8', className)}>
       {/* Basic Info Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
+      <Card variant="elevated" className="overflow-hidden">
+        <CardHeader className="border-b border-border/50 bg-muted/30">
+          <CardTitle className="font-display text-h3">Basic Information</CardTitle>
           <CardDescription>
             Enter the recipe title, description, and other details.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5 pt-6">
           {/* Title */}
           <div>
             <label htmlFor="title" className="block text-sm font-medium mb-1.5">
@@ -412,9 +412,10 @@ export function RecipeForm({
               placeholder="Brief description of the recipe..."
               rows={3}
               className={cn(
-                'flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm',
-                'placeholder:text-muted-foreground',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                'flex min-h-[100px] w-full rounded-sm border-[1.5px] border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-y',
+                'placeholder:text-muted-foreground placeholder:italic',
+                'transition-all duration-200 ease-out',
+                'focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20',
                 'disabled:cursor-not-allowed disabled:opacity-50'
               )}
             />
@@ -493,8 +494,10 @@ export function RecipeForm({
                 value={cuisine}
                 onChange={(e) => setCuisine(e.target.value)}
                 className={cn(
-                  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm',
-                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                  'flex h-11 w-full rounded-sm border-[1.5px] border-input bg-transparent px-3 py-2 text-sm shadow-sm appearance-none cursor-pointer',
+                  'transition-all duration-200 ease-out',
+                  'focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20',
+                  'hover:border-primary/50'
                 )}
               >
                 <option value="">Select...</option>
@@ -509,20 +512,21 @@ export function RecipeForm({
 
           {/* Difficulty */}
           <div>
-            <label htmlFor="difficulty" className="block text-sm font-medium mb-1.5">
+            <label id="difficulty-label" className="block text-sm font-medium mb-2.5">
               Difficulty
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-3" role="group" aria-labelledby="difficulty-label">
               {DIFFICULTIES.map((d) => (
                 <button
                   key={d.value}
                   type="button"
                   onClick={() => setDifficulty(difficulty === d.value ? '' : d.value)}
+                  aria-pressed={difficulty === d.value}
                   className={cn(
-                    'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                    'px-4 py-2 rounded-sm border-[1.5px] text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                     difficulty === d.value
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted hover:bg-muted/80'
+                      ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                      : 'bg-background border-input hover:border-primary/50 hover:bg-muted/50'
                   )}
                 >
                   {d.label}
@@ -534,23 +538,34 @@ export function RecipeForm({
       </Card>
 
       {/* Ingredients Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Ingredients</CardTitle>
+      <Card variant="elevated" className="overflow-hidden">
+        <CardHeader className="border-b border-border/50 bg-muted/30">
+          <CardTitle className="font-display text-h3">Ingredients</CardTitle>
           <CardDescription>
             Add the ingredients needed for this recipe.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4 pt-6">
+          {/* Column headers */}
+          <div className="hidden sm:flex gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide pb-1 border-b border-border/30">
+            <div className="w-20">Qty</div>
+            <div className="w-24">Unit</div>
+            <div className="flex-1">Ingredient</div>
+            <div className="w-32">Notes</div>
+            <div className="w-10"></div>
+          </div>
           {ingredients.map((ing, index) => (
-            <div key={ing.id} className="flex flex-wrap sm:flex-nowrap gap-2 items-start">
+            <div
+              key={ing.id}
+              className="flex flex-wrap sm:flex-nowrap gap-2 items-center group transition-all duration-200 ease-out p-2 -mx-2 rounded-sm hover:bg-muted/30"
+            >
               <div className="w-16 sm:w-20">
                 <Input
                   type="text"
                   value={ing.quantity}
                   onChange={(e) => updateIngredient(ing.id, 'quantity', e.target.value)}
                   placeholder="Qty"
-                  className="text-center"
+                  className="text-center font-mono"
                 />
               </div>
               <div className="w-16 sm:w-24">
@@ -575,6 +590,7 @@ export function RecipeForm({
                   value={ing.notes}
                   onChange={(e) => updateIngredient(ing.id, 'notes', e.target.value)}
                   placeholder="Notes"
+                  className="text-muted-foreground"
                 />
               </div>
               <Button
@@ -583,7 +599,8 @@ export function RecipeForm({
                 size="icon"
                 onClick={() => removeIngredient(ing.id)}
                 disabled={ingredients.length <= 1}
-                className="shrink-0 h-10 w-10 touch-manipulation"
+                className="shrink-0 h-10 w-10 touch-manipulation opacity-50 group-hover:opacity-100 transition-opacity duration-200"
+                aria-label={`Remove ingredient ${index + 1}`}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -594,38 +611,42 @@ export function RecipeForm({
             variant="outline"
             size="sm"
             onClick={addIngredient}
-            className="mt-2"
+            className="mt-3"
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="h-4 w-4 mr-1.5" />
             Add Ingredient
           </Button>
         </CardContent>
       </Card>
 
       {/* Instructions Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Instructions</CardTitle>
+      <Card variant="elevated" className="overflow-hidden">
+        <CardHeader className="border-b border-border/50 bg-muted/30">
+          <CardTitle className="font-display text-h3">Instructions</CardTitle>
           <CardDescription>
             Add step-by-step instructions for preparing this recipe.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4 pt-6">
           {instructions.map((inst, index) => (
-            <div key={inst.id} className="flex gap-2 items-start">
-              <div className="w-8 h-9 flex items-center justify-center text-sm font-medium text-muted-foreground">
-                {index + 1}.
+            <div
+              key={inst.id}
+              className="flex gap-3 items-start group transition-all duration-200 ease-out"
+            >
+              <div className="w-8 h-11 flex items-center justify-center text-sm font-mono font-semibold text-primary bg-primary/10 rounded-sm shrink-0">
+                {index + 1}
               </div>
               <div className="flex-1">
                 <textarea
                   value={inst.text}
                   onChange={(e) => updateInstruction(inst.id, e.target.value)}
-                  placeholder={`Step ${index + 1}...`}
+                  placeholder={`Describe step ${index + 1}...`}
                   rows={2}
                   className={cn(
-                    'flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm',
-                    'placeholder:text-muted-foreground',
-                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                    'flex min-h-[100px] w-full rounded-sm border-[1.5px] border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-y',
+                    'placeholder:text-muted-foreground placeholder:italic',
+                    'transition-all duration-200 ease-out',
+                    'focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20',
                     'disabled:cursor-not-allowed disabled:opacity-50'
                   )}
                 />
@@ -636,7 +657,8 @@ export function RecipeForm({
                 size="icon"
                 onClick={() => removeInstruction(inst.id)}
                 disabled={instructions.length <= 1}
-                className="shrink-0 h-10 w-10 touch-manipulation"
+                className="shrink-0 h-10 w-10 touch-manipulation opacity-50 group-hover:opacity-100 transition-opacity duration-200"
+                aria-label={`Remove step ${index + 1}`}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -650,23 +672,23 @@ export function RecipeForm({
             variant="outline"
             size="sm"
             onClick={addInstruction}
-            className="mt-2"
+            className="mt-3"
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="h-4 w-4 mr-1.5" />
             Add Step
           </Button>
         </CardContent>
       </Card>
 
       {/* Tags Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Tags</CardTitle>
+      <Card variant="elevated" className="overflow-hidden">
+        <CardHeader className="border-b border-border/50 bg-muted/30">
+          <CardTitle className="font-display text-h3">Tags</CardTitle>
           <CardDescription>
             Add tags to help categorize and find this recipe.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <TagInput
             value={tags}
             onChange={setTags}

@@ -84,48 +84,49 @@ export function GroceryItem({ item, week, className }: GroceryItemProps) {
   return (
     <div
       className={cn(
-        'flex items-start gap-3 rounded-lg border p-3 transition-colors',
-        isChecked && 'bg-muted/50',
+        'flex items-center gap-4 rounded-lg border p-4 transition-all duration-200',
+        isChecked && 'bg-muted/40 opacity-75',
+        !isChecked && 'hover:border-primary/30 hover:shadow-sm',
         className
       )}
     >
-      {/* Tri-state checkbox */}
+      {/* Tri-state checkbox - 44px minimum touch target for mobile */}
       <button
         type="button"
         onClick={handleStatusToggle}
         disabled={updateItem.isPending}
         className={cn(
-          'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border transition-colors touch-manipulation',
+          'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 transition-all duration-200 touch-manipulation',
           'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          isChecked && 'border-primary bg-primary text-primary-foreground',
-          isPartial && 'border-amber-500 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-          !isChecked && !isPartial && 'border-input bg-background hover:border-primary/50'
+          'active:scale-90',
+          isChecked && 'border-success bg-success text-success-foreground scale-100',
+          isPartial && 'border-warning bg-warning/20 text-warning-foreground',
+          !isChecked && !isPartial && 'border-muted-foreground/30 bg-background hover:border-primary hover:bg-primary/5'
         )}
         aria-label={`Mark ${item.name} as ${getNextStatus(item.status).replace(/_/g, ' ')}`}
       >
-        {isChecked && <Check className="h-4 w-4" />}
-        {isPartial && <Minus className="h-4 w-4" />}
-        {!isChecked && !isPartial && <Square className="h-3 w-3 opacity-0" />}
+        {isChecked && <Check className="h-6 w-6 animate-in zoom-in-50 duration-200" />}
+        {isPartial && <Minus className="h-6 w-6" />}
       </button>
 
       {/* Item content */}
       <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          {/* Item name */}
+        <div className="flex items-center justify-between gap-3">
+          {/* Item name - prominent */}
           <span
             className={cn(
-              'font-medium leading-tight',
-              isChecked && 'text-muted-foreground line-through'
+              'text-base font-medium leading-tight',
+              isChecked && 'text-muted-foreground line-through decoration-2'
             )}
           >
             {item.name}
           </span>
 
-          {/* Quantity */}
+          {/* Quantity - secondary styling */}
           <span
             className={cn(
-              'shrink-0 text-sm tabular-nums',
+              'shrink-0 rounded-md bg-muted/50 px-2 py-0.5 font-mono text-sm tabular-nums',
               isChecked ? 'text-muted-foreground' : 'text-foreground'
             )}
           >
@@ -135,14 +136,14 @@ export function GroceryItem({ item, week, className }: GroceryItemProps) {
 
         {/* Source recipes */}
         {recipeNames.length > 0 && (
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1.5 text-sm text-muted-foreground">
             For: {recipeNames.join(', ')}
           </p>
         )}
 
         {/* Partial quantity indicator */}
         {isPartial && item.haveQuantity !== null && (
-          <p className="mt-1 text-sm font-medium text-amber-600 dark:text-amber-400">
+          <p className="mt-1.5 text-sm font-medium text-warning-foreground">
             Have {formatQuantity(item.haveQuantity, item.unit)} / Need{' '}
             {formatQuantity(needQuantity, item.unit)} more
           </p>

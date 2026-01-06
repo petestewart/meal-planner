@@ -83,9 +83,10 @@ export function RecipePreview({
             placeholder="Brief description of the recipe"
             rows={3}
             className={cn(
-              'flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm',
-              'placeholder:text-muted-foreground',
-              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+              'flex min-h-[100px] w-full rounded-sm border-[1.5px] border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-y',
+              'placeholder:text-muted-foreground placeholder:italic',
+              'transition-all duration-200 ease-out',
+              'focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20',
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}
           />
