@@ -196,7 +196,10 @@ export class PlanService {
     notes?: string,
     actor: string = DEFAULT_ACTOR,
     slotType: SlotType = 'recipe',
-    leftoversSourceId: string | null = null
+    leftoversSourceId: string | null = null,
+    batchId: string | null = null,
+    isSideDish: boolean = false,
+    mainItemId: string | null = null
   ): PlanItem | null {
     // Verify plan exists
     if (!this.planRepo.exists(planId)) {
@@ -216,6 +219,17 @@ export class PlanService {
       }
     }
 
+    // Verify main item exists if this is a side dish
+    if (isSideDish && mainItemId) {
+      const mainItem = this.planRepo.getMealById(mainItemId);
+      if (!mainItem) {
+        throw new Error(`Main dish ${mainItemId} not found`);
+      }
+      if (mainItem.isSideDish) {
+        throw new Error('Cannot add a side dish to another side dish');
+      }
+    }
+
     const item = this.planRepo.setMeal(
       planId,
       dayOfWeek,
@@ -224,7 +238,10 @@ export class PlanService {
       servings,
       notes ?? null,
       slotType,
-      leftoversSourceId
+      leftoversSourceId,
+      batchId,
+      isSideDish,
+      mainItemId
     );
 
     this.auditRepo.log({
@@ -240,10 +257,49 @@ export class PlanService {
         servings: item.servings,
         slotType,
         leftoversSourceId,
+        batchId,
+        isSideDish,
+        mainItemId,
       },
     });
 
     return item;
+  }
+
+  /**
+   * Link an existing plan item to a batch.
+   * Logs 'update' action to audit log for plan_item.
+   * Returns null if plan item not found.
+   */
+  linkMealToBatch(
+    planItemId: string,
+    batchId: string | null,
+    actor: string = DEFAULT_ACTOR
+  ): PlanItem | null {
+    const item = this.planRepo.setBatchId(planItemId, batchId);
+
+    if (item) {
+      this.auditRepo.log({
+        actor,
+        action: 'update',
+        entityType: 'plan_item',
+        entityId: item.id,
+        details: {
+          action: batchId ? 'link_to_batch' : 'unlink_from_batch',
+          batchId,
+        },
+      });
+    }
+
+    return item;
+  }
+
+  /**
+   * Get all plan items linked to a specific batch.
+   * No audit logging for read operations.
+   */
+  getMealsByBatchId(batchId: string): PlanItem[] {
+    return this.planRepo.getMealsByBatchId(batchId);
   }
 
   /**
@@ -303,6 +359,109 @@ export class PlanService {
    */
   getPlanAuditLog(planId: string) {
     return this.auditRepo.getByEntityId(planId);
+  }
+
+  // ============================================
+  // Side Dish Methods
+  // ============================================
+
+  /**
+   * Add a side dish to an existing main dish meal.
+   * Validates that the recipe exists.
+   * Logs 'create' action to audit log for plan_item.
+   * Returns null if plan or main item not found.
+   * Throws error if recipe not found or if main item is a side dish.
+   */
+  addSide(
+    planId: string,
+    mainItemId: string,
+    recipeId: string,
+    servings: number = 2,
+    notes: string | null = null,
+    actor: string = DEFAULT_ACTOR
+  ): PlanItem | null {
+    // Verify plan exists
+    if (!this.planRepo.exists(planId)) {
+      return null;
+    }
+
+    // Verify recipe exists
+    if (!this.recipeRepo.exists(recipeId)) {
+      throw new Error(`Recipe ${recipeId} not found`);
+    }
+
+    // Verify main item exists and is not a side dish
+    const mainItem = this.planRepo.getMealById(mainItemId);
+    if (!mainItem) {
+      throw new Error(`Main dish ${mainItemId} not found`);
+    }
+    if (mainItem.isSideDish) {
+      throw new Error('Cannot add a side dish to another side dish');
+    }
+
+    const item = this.planRepo.addSide(planId, mainItemId, recipeId, servings, notes);
+
+    if (item) {
+      this.auditRepo.log({
+        actor,
+        action: 'create',
+        entityType: 'plan_item',
+        entityId: item.id,
+        details: {
+          planId,
+          mainItemId,
+          recipeId,
+          servings,
+          isSideDish: true,
+        },
+      });
+    }
+
+    return item;
+  }
+
+  /**
+   * Get all side dishes for a main dish.
+   * No audit logging for read operations.
+   */
+  getSidesForMeal(mainItemId: string): PlanItem[] {
+    return this.planRepo.getSidesForMeal(mainItemId);
+  }
+
+  /**
+   * Remove a side dish.
+   * Logs 'delete' action to audit log for plan_item.
+   * Returns true if removed, false if not found or not a side dish.
+   */
+  removeSide(sideItemId: string, actor: string = DEFAULT_ACTOR): boolean {
+    // Get side info before deletion for audit log
+    const side = this.planRepo.getMealById(sideItemId);
+
+    const removed = this.planRepo.removeSide(sideItemId);
+
+    if (removed && side) {
+      this.auditRepo.log({
+        actor,
+        action: 'delete',
+        entityType: 'plan_item',
+        entityId: sideItemId,
+        details: {
+          recipeId: side.recipeId,
+          mainItemId: side.mainItemId,
+          isSideDish: true,
+        },
+      });
+    }
+
+    return removed;
+  }
+
+  /**
+   * Get the main dish for a slot (excluding side dishes).
+   * No audit logging for read operations.
+   */
+  getMainMealBySlot(planId: string, dayOfWeek: number, mealType: MealType): PlanItem | null {
+    return this.planRepo.getMainMealBySlot(planId, dayOfWeek, mealType);
   }
 
   // ============================================

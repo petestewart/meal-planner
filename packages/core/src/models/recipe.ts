@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Valid source types for recipes as defined in the database schema.
  */
-export const SourceTypeEnum = z.enum(['manual', 'imported', 'agent_curated']);
+export const SourceTypeEnum = z.enum(['manual', 'imported', 'agent_curated', 'variation']);
 export type SourceType = z.infer<typeof SourceTypeEnum>;
 
 /**
@@ -53,6 +53,8 @@ export const RecipeSchema = z.object({
   cuisine: z.string().nullable(),
   difficulty: DifficultyEnum.nullable(),
   isFavorite: z.boolean().default(false),
+  parentRecipeId: z.string().nullable().optional(),
+  versionName: z.string().nullable().optional(),
   createdAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)),
   updatedAt: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)),
 });

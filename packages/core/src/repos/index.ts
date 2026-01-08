@@ -31,6 +31,7 @@ export {
   IngredientRepository,
   INGREDIENT_CATEGORIES,
   getAutoCategory,
+  getAutoStoreSection,
   isValidCategory,
   type IngredientCategory,
 } from './ingredient.repo.js';
@@ -56,3 +57,13 @@ export {
   type IngredientOverride,
   type UpsertRecipeModification,
 } from './recipe-modification.repo.js';
+
+export {
+  PrepBatchRepository,
+  type ListPrepBatchesOptions,
+} from './prep-batch.repo.js';
+
+export {
+  SubstitutionRepository,
+  type ListSubstitutionsOptions,
+} from './substitution.repo.js';

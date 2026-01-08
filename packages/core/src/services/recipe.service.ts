@@ -17,11 +17,14 @@ import {
   type RecipeModification,
   type IngredientOverride,
 } from '../repos/recipe-modification.repo.js';
+import { SubstitutionRepository } from '../repos/substitution.repo.js';
+import { IngredientRepository } from '../repos/ingredient.repo.js';
 import type {
   CreateRecipe,
   UpdateRecipe,
   RecipeWithRelations,
   RecipeIngredient,
+  Substitution,
 } from '../models/index.js';
 
 /**
@@ -120,15 +123,39 @@ function formatQuantity(value: number): number {
  */
 const DEFAULT_ACTOR: AuditActor = 'user';
 
+/**
+ * Ingredient with substitution suggestions
+ */
+export interface IngredientWithSubstitutions {
+  ingredientId: string;
+  ingredientName: string;
+  substitutions: Substitution[];
+  hasSubstitutions: boolean;
+}
+
+/**
+ * Result of getting substitution suggestions for a recipe
+ */
+export interface RecipeSubstitutionSuggestions {
+  recipeId: string;
+  recipeTitle: string;
+  ingredients: IngredientWithSubstitutions[];
+  totalWithSubstitutions: number;
+}
+
 export class RecipeService {
   private recipeRepo: RecipeRepository;
   private auditRepo: AuditRepository;
   private modificationRepo: RecipeModificationRepository;
+  private substitutionRepo: SubstitutionRepository;
+  private ingredientRepo: IngredientRepository;
 
   constructor(db: Database) {
     this.recipeRepo = new RecipeRepository(db);
     this.auditRepo = new AuditRepository(db);
     this.modificationRepo = new RecipeModificationRepository(db);
+    this.substitutionRepo = new SubstitutionRepository(db);
+    this.ingredientRepo = new IngredientRepository(db);
   }
 
   /**
@@ -559,5 +586,147 @@ export class RecipeService {
     });
 
     return modification;
+  }
+
+  // ==================== Recipe Versioning ====================
+
+  /**
+   * Fork a recipe to create a new version/variation.
+   *
+   * Creates a copy of the recipe with all its ingredients and tags.
+   * The new version has source_type='variation' and links to the parent.
+   *
+   * @param recipeId - The ID of the recipe to fork
+   * @param versionName - The name for this version (e.g., "sous vide", "vegan")
+   * @param actor - The actor performing the operation
+   * @returns The newly created recipe version
+   * @throws Error if recipe not found
+   */
+  forkRecipe(
+    recipeId: string,
+    versionName: string,
+    actor: string = DEFAULT_ACTOR
+  ): RecipeWithRelations {
+    const forked = this.recipeRepo.forkRecipe(recipeId, versionName);
+
+    if (!forked) {
+      throw new Error(`Recipe not found: ${recipeId}`);
+    }
+
+    this.auditRepo.log({
+      actor,
+      action: 'create',
+      entityType: 'recipe',
+      entityId: forked.id,
+      details: {
+        title: forked.title,
+        versionName,
+        parentRecipeId: recipeId,
+        operation: 'fork',
+      },
+    });
+
+    return forked;
+  }
+
+  /**
+   * Get all versions of a recipe (including the original).
+   *
+   * @param recipeId - The ID of any recipe in the version chain
+   * @returns Array of all versions including the original
+   */
+  getRecipeVersions(recipeId: string): RecipeWithRelations[] {
+    return this.recipeRepo.getVersions(recipeId);
+  }
+
+  /**
+   * Get the parent recipe for a version.
+   *
+   * @param recipeId - The ID of a recipe version
+   * @returns The parent recipe, or null if this is not a version
+   */
+  getParentRecipe(recipeId: string): RecipeWithRelations | null {
+    return this.recipeRepo.getParentRecipe(recipeId);
+  }
+
+  // ==================== Substitution Suggestions ====================
+
+  /**
+   * Get substitution suggestions for all ingredients in a recipe.
+   * Useful when the user is missing some ingredients and wants alternatives.
+   *
+   * @param recipeId - The ID of the recipe
+   * @param ingredientNames - Optional list of specific ingredient names to get suggestions for
+   *                          (if not provided, gets suggestions for all ingredients)
+   * @returns Substitution suggestions for each ingredient
+   */
+  getSubstitutionSuggestions(
+    recipeId: string,
+    ingredientNames?: string[]
+  ): RecipeSubstitutionSuggestions | null {
+    const recipe = this.recipeRepo.getById(recipeId);
+    if (!recipe) {
+      return null;
+    }
+
+    const ingredients: IngredientWithSubstitutions[] = [];
+    let totalWithSubstitutions = 0;
+
+    // Get ingredients to process
+    const ingredientsToProcess = recipe.ingredients ?? [];
+
+    for (const ing of ingredientsToProcess) {
+      // Look up ingredient name from the ingredient table
+      const ingredientDetails = this.ingredientRepo.getById(ing.ingredientId);
+      const ingredientName = ingredientDetails?.name ?? 'Unknown Ingredient';
+
+      // Skip if we have a specific list and this ingredient isn't in it
+      if (ingredientNames && ingredientNames.length > 0) {
+        const ingNameLower = ingredientName.toLowerCase();
+        const matches = ingredientNames.some(
+          name => name.toLowerCase() === ingNameLower
+        );
+        if (!matches) {
+          continue;
+        }
+      }
+
+      // Find substitutions for this ingredient
+      const substitutions = this.substitutionRepo.findByIngredient(ingredientName);
+      const hasSubstitutions = substitutions.length > 0;
+
+      if (hasSubstitutions) {
+        totalWithSubstitutions++;
+      }
+
+      ingredients.push({
+        ingredientId: ing.ingredientId,
+        ingredientName,
+        substitutions,
+        hasSubstitutions,
+      });
+    }
+
+    return {
+      recipeId: recipe.id,
+      recipeTitle: recipe.title,
+      ingredients,
+      totalWithSubstitutions,
+    };
+  }
+
+  /**
+   * Get substitution suggestions for missing ingredients.
+   * Given a list of ingredients the user doesn't have, find alternatives.
+   *
+   * @param recipeId - The ID of the recipe
+   * @param missingIngredientNames - Names of ingredients the user is missing
+   * @returns Substitution suggestions for the missing ingredients
+   */
+  suggestSubstitutionsForMissing(
+    recipeId: string,
+    missingIngredientNames: string[]
+  ): RecipeSubstitutionSuggestions | null {
+    return this.getSubstitutionSuggestions(recipeId, missingIngredientNames);
   }
 }

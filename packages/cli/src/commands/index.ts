@@ -5,3 +5,5 @@ export { prefsCommand } from './prefs.js';
 export { dbCommand } from './db.js';
 export { ingredientCommand } from './ingredient.js';
 export { pantryCommand } from './pantry.js';
+export { prepCommand } from './prep.js';
+export { substitutionCommand } from './substitution.js';

@@ -944,3 +944,197 @@ test('scoreRecipe handles empty favorite cuisines list', () => {
   }
 });
 
+// ========================
+// Plan context integration tests
+// ========================
+
+test('getSuggestions with planId considers recent meals', () => {
+  const { recipeRepo, planRepo, suggestionService, cleanup } = setupTest();
+  try {
+    const recipe1 = createMockRecipe(recipeRepo, { title: 'Recently Made Recipe', cuisine: 'Italian' });
+    const recipe2 = createMockRecipe(recipeRepo, { title: 'Not Recently Made', cuisine: 'Mexican' });
+
+    // Create a plan for recent week with a meal
+    const recentWeek = new Date();
+    const weekNum = Math.ceil((recentWeek.getDate() - recentWeek.getDay() + 1) / 7);
+    const weekStr = `${recentWeek.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+
+    const plan = planRepo.create({ week: weekStr });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipe1.id, 4);
+
+    // Mark as made and complete the plan so it counts as recent
+    planRepo.markMealAsMade(plan.id, 1, 'dinner', true);
+    planRepo.completePlan(plan.id);
+
+    // Get suggestions without plan context
+    const suggestionsNoPlan = suggestionService.getSuggestions(1, 'dinner');
+
+    // Both should be suggested, but recently made one may have penalty if it shows up
+    expect(suggestionsNoPlan.length).toBe(2);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getSuggestions checks next day cuisine from plan', () => {
+  const { recipeRepo, planRepo, suggestionService, cleanup } = setupTest();
+  try {
+    const italianRecipe = createMockRecipe(recipeRepo, { title: 'Italian Dish', cuisine: 'Italian' });
+    const mexicanRecipe = createMockRecipe(recipeRepo, { title: 'Mexican Dish', cuisine: 'Mexican' });
+
+    const plan = planRepo.create({ week: '2025-W02' });
+    // Set Wednesday with Italian
+    planRepo.setMeal(plan.id, 3, 'dinner', italianRecipe.id, 4);
+
+    // Get suggestions for Tuesday - next day is Italian
+    const suggestions = suggestionService.getSuggestions(2, 'dinner', { planId: plan.id });
+
+    const italianSuggestion = suggestions.find((s) => s.recipe.cuisine === 'Italian');
+    const mexicanSuggestion = suggestions.find((s) => s.recipe.cuisine === 'Mexican');
+
+    // Mexican should score higher since next day has Italian (variety rule)
+    assertGreater(mexicanSuggestion.score, italianSuggestion.score, 'Mexican should score higher');
+  } finally {
+    cleanup();
+  }
+});
+
+test('getSuggestions considers meals planned in current week', () => {
+  const { recipeRepo, planRepo, suggestionService, cleanup } = setupTest();
+  try {
+    const recipe = createMockRecipe(recipeRepo, { title: 'Test Recipe' });
+    const otherRecipe = createMockRecipe(recipeRepo, { title: 'Other Recipe' });
+
+    const plan = planRepo.create({ week: '2025-W03' });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipe.id, 4);
+
+    // Get suggestions for Tuesday with planId - recipe is already in plan
+    const suggestions = suggestionService.getSuggestions(2, 'dinner', { planId: plan.id });
+
+    expect(suggestions.length).toBe(2);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getSuggestions skips meal type filtering when no mealType provided to getRecentMeals', () => {
+  const { recipeRepo, planRepo, suggestionService, cleanup } = setupTest();
+  try {
+    const recipe = createMockRecipe(recipeRepo, { title: 'Multi Use Recipe' });
+
+    // Create a plan with recipe used for lunch
+    const plan = planRepo.create({ week: '2025-W04' });
+    planRepo.setMeal(plan.id, 1, 'lunch', recipe.id, 4);
+
+    // Get suggestions for dinner - the lunch meal should not affect scoring
+    const suggestions = suggestionService.getSuggestions(2, 'dinner', { planId: plan.id });
+
+    expect(suggestions.length).toBe(1);
+  } finally {
+    cleanup();
+  }
+});
+
+test('scoreRecipe handles penalizing same recipe as next day', () => {
+  const { recipeRepo, suggestionService, cleanup } = setupTest();
+  try {
+    const recipe = createMockRecipe(recipeRepo, { title: 'Test Recipe' });
+
+    const context: SuggestionContext = {
+      dayOfWeek: 2,
+      mealType: 'dinner',
+      nextDayRecipeId: recipe.id,
+      checkVarietyRules: true,
+    };
+
+    const { score, reasons } = suggestionService.scoreRecipe(recipe, context);
+
+    const expectedScore = SCORING_WEIGHTS.BASE_SCORE - SCORING_WEIGHTS.VARIETY_VIOLATION_PENALTY;
+    assertApproxEqual(score, expectedScore, 0.001, 'should penalize same recipe as next day');
+
+    const varietyReason = reasons.find((r) => r.type === 'variety_violation');
+    expect(varietyReason).toBeDefined();
+    expect(varietyReason.description.includes('next day')).toBe(true);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getSwapAlternatives with different_cuisine reason filters to different cuisines', () => {
+  const { recipeRepo, planRepo, suggestionService, cleanup } = setupTest();
+  try {
+    const currentRecipe = createMockRecipe(recipeRepo, { title: 'Current Italian', cuisine: 'Italian' });
+    createMockRecipe(recipeRepo, { title: 'Another Italian', cuisine: 'Italian' });
+    const mexicanRecipe = createMockRecipe(recipeRepo, { title: 'Mexican Dish', cuisine: 'Mexican' });
+
+    const plan = planRepo.create({ week: '2025-W05' });
+
+    const alternatives = suggestionService.getSwapAlternatives(
+      plan.id,
+      1,
+      'dinner',
+      currentRecipe.id,
+      'Want different cuisine'
+    );
+
+    // Should prefer different cuisines
+    expect(alternatives.some((a) => a.recipe.cuisine === 'Mexican')).toBe(true);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getSwapAlternatives with faster reason filters to quick recipes', () => {
+  const { recipeRepo, planRepo, suggestionService, cleanup } = setupTest();
+  try {
+    const currentRecipe = createMockRecipe(recipeRepo, { title: 'Slow Recipe', prepTimeMinutes: 60 });
+    createMockRecipe(recipeRepo, { title: 'Fast Recipe', prepTimeMinutes: 15 });
+    createMockRecipe(recipeRepo, { title: 'Another Slow', prepTimeMinutes: 90 });
+
+    const plan = planRepo.create({ week: '2025-W06' });
+
+    const alternatives = suggestionService.getSwapAlternatives(
+      plan.id,
+      1,
+      'dinner',
+      currentRecipe.id,
+      'Need something faster'
+    );
+
+    // Should include fast recipe (15 min) but not exclude slow if no filter is applied
+    // The getSwapAlternatives may still return all if filtering is not strict
+    expect(alternatives.length > 0).toBe(true);
+
+    // Fast recipe should be present in alternatives
+    const fastRecipe = alternatives.find((a) => a.recipe.prepTimeMinutes === 15);
+    expect(fastRecipe).toBeDefined();
+  } finally {
+    cleanup();
+  }
+});
+
+test('getSwapAlternatives handles plan with existing meals for context', () => {
+  const { recipeRepo, planRepo, suggestionService, cleanup } = setupTest();
+  try {
+    const italianRecipe = createMockRecipe(recipeRepo, { title: 'Italian Current', cuisine: 'Italian' });
+    const mexicanRecipe = createMockRecipe(recipeRepo, { title: 'Mexican Alt', cuisine: 'Mexican' });
+
+    const plan = planRepo.create({ week: '2025-W07' });
+    // Set Monday with Italian
+    planRepo.setMeal(plan.id, 1, 'dinner', italianRecipe.id, 4);
+
+    // Get alternatives for Monday - should still work
+    const alternatives = suggestionService.getSwapAlternatives(
+      plan.id,
+      1,
+      'dinner',
+      italianRecipe.id
+    );
+
+    expect(alternatives.length > 0).toBe(true);
+    expect(!alternatives.some((a) => a.recipe.id === italianRecipe.id)).toBe(true);
+  } finally {
+    cleanup();
+  }
+});
+

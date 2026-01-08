@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import { getDb, migrate, getDefaultMigrationsDir } from '@meals/core';
 import { errorHandler } from './middleware/error-handler.js';
 import { ErrorCodes, errorResponse, successResponse } from './types.js';
-import { recipeRoutes, planRoutes, groceryRoutes, preferenceRoutes } from './routes/index.js';
+import { recipeRoutes, planRoutes, groceryRoutes, preferenceRoutes, substitutionRoutes, ingredientRoutes } from './routes/index.js';
 
 /**
  * Health check response type
@@ -58,6 +58,8 @@ export async function buildServer() {
   await server.register(planRoutes);
   await server.register(groceryRoutes);
   await server.register(preferenceRoutes);
+  await server.register(substitutionRoutes);
+  await server.register(ingredientRoutes);
 
   return server;
 }

@@ -650,3 +650,620 @@ test('supports all actor types', () => {
   }
 });
 
+// =====================
+// Scale Recipe Tests
+// =====================
+
+describe('scaleRecipe', () => {
+  test('scaleRecipe doubles quantities when doubling servings', () => {
+    const { db, service, cleanup } = setupTestDb();
+    try {
+      const ingredientId = createTestIngredient(db, 'Flour', 'Pantry');
+
+      const recipe = service.createRecipe(
+        {
+          title: 'Scalable Recipe',
+          instructions: 'Mix ingredients',
+          servings: 4,
+          description: null,
+          prepTimeMinutes: null,
+          cookTimeMinutes: null,
+          sourceUrl: null,
+          sourceType: null,
+          cuisine: null,
+          difficulty: null,
+        },
+        [{ ingredientId, quantity: 2, unit: 'cups', notes: null, optional: false }]
+      );
+
+      const scaled = service.scaleRecipe(recipe.id, 8);
+
+      expect(scaled).not.toBeNull();
+      expect(scaled!.servings).toBe(8);
+      expect(scaled!.ingredients![0].quantity).toBe(4); // 2 cups * 2 = 4 cups
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('scaleRecipe halves quantities when halving servings', () => {
+    const { db, service, cleanup } = setupTestDb();
+    try {
+      const ingredientId = createTestIngredient(db, 'Sugar', 'Pantry');
+
+      const recipe = service.createRecipe(
+        {
+          title: 'Recipe',
+          instructions: 'Mix',
+          servings: 8,
+          description: null,
+          prepTimeMinutes: null,
+          cookTimeMinutes: null,
+          sourceUrl: null,
+          sourceType: null,
+          cuisine: null,
+          difficulty: null,
+        },
+        [{ ingredientId, quantity: 4, unit: 'pieces', notes: null, optional: false }]
+      );
+
+      const scaled = service.scaleRecipe(recipe.id, 4);
+
+      expect(scaled!.servings).toBe(4);
+      expect(scaled!.ingredients![0].quantity).toBe(2); // 4 pieces / 2 = 2 pieces
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('scaleRecipe handles null quantities', () => {
+    const { db, service, cleanup } = setupTestDb();
+    try {
+      const ingredientId = createTestIngredient(db, 'Salt', 'Pantry');
+
+      const recipe = service.createRecipe(
+        {
+          title: 'Recipe',
+          instructions: 'Season',
+          servings: 4,
+          description: null,
+          prepTimeMinutes: null,
+          cookTimeMinutes: null,
+          sourceUrl: null,
+          sourceType: null,
+          cuisine: null,
+          difficulty: null,
+        },
+        [{ ingredientId, quantity: null, unit: null, notes: 'to taste', optional: false }]
+      );
+
+      const scaled = service.scaleRecipe(recipe.id, 8);
+
+      expect(scaled!.ingredients![0].quantity).toBeNull();
+      expect(scaled!.ingredients![0].notes).toBe('to taste');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('scaleRecipe returns null for non-existent recipe', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const scaled = service.scaleRecipe('non-existent-id', 8);
+      expect(scaled).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('scaleRecipe converts large quantities to larger units', () => {
+    const { db, service, cleanup } = setupTestDb();
+    try {
+      const ingredientId = createTestIngredient(db, 'Water', 'Pantry');
+
+      const recipe = service.createRecipe(
+        {
+          title: 'Recipe',
+          instructions: 'Mix',
+          servings: 1,
+          description: null,
+          prepTimeMinutes: null,
+          cookTimeMinutes: null,
+          sourceUrl: null,
+          sourceType: null,
+          cuisine: null,
+          difficulty: null,
+        },
+        [{ ingredientId, quantity: 500, unit: 'g', notes: null, optional: false }]
+      );
+
+      const scaled = service.scaleRecipe(recipe.id, 4);
+
+      // 500g * 4 = 2000g = 2kg
+      expect(scaled!.ingredients![0].quantity).toBe(2);
+      expect(scaled!.ingredients![0].unit).toBe('kg');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('scaleRecipe does not modify original recipe', () => {
+    const { db, service, cleanup } = setupTestDb();
+    try {
+      const ingredientId = createTestIngredient(db, 'Butter', 'Dairy');
+
+      const recipe = service.createRecipe(
+        {
+          title: 'Original',
+          instructions: 'Cook',
+          servings: 4,
+          description: null,
+          prepTimeMinutes: null,
+          cookTimeMinutes: null,
+          sourceUrl: null,
+          sourceType: null,
+          cuisine: null,
+          difficulty: null,
+        },
+        [{ ingredientId, quantity: 100, unit: 'g', notes: null, optional: false }]
+      );
+
+      service.scaleRecipe(recipe.id, 8);
+
+      // Verify original is unchanged
+      const original = service.getRecipe(recipe.id);
+      expect(original!.servings).toBe(4);
+      expect(original!.ingredients![0].quantity).toBe(100);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+// =====================
+// Toggle Favorite Tests
+// =====================
+
+describe('toggleFavorite', () => {
+  test('toggleFavorite sets recipe as favorite', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Favorite Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      const updated = service.toggleFavorite(recipe.id);
+
+      expect(updated.isFavorite).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('toggleFavorite unsets favorite', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      // Toggle on
+      service.toggleFavorite(recipe.id);
+      // Toggle off
+      const updated = service.toggleFavorite(recipe.id);
+
+      expect(updated.isFavorite).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('toggleFavorite creates audit log entry', () => {
+    const { db, service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      service.toggleFavorite(recipe.id, 'api');
+
+      const auditEntries = getAuditEntries(db, recipe.id);
+      const favoriteEntry = auditEntries.find((e) => e.action === 'favorite');
+      expect(favoriteEntry).toBeDefined();
+      expect(favoriteEntry!.actor).toBe('api');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('toggleFavorite throws for non-existent recipe', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      expect(() => service.toggleFavorite('non-existent-id')).toThrow();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('getFavoriteRecipeIds returns favorite IDs', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe1 = service.createRecipe({
+        title: 'Recipe 1',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+      const recipe2 = service.createRecipe({
+        title: 'Recipe 2',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      service.toggleFavorite(recipe1.id);
+
+      const favorites = service.getFavoriteRecipeIds();
+      expect(favorites).toContain(recipe1.id);
+      expect(favorites).not.toContain(recipe2.id);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+// =====================
+// Modification Tests
+// =====================
+
+describe('recipe modifications', () => {
+  test('getModifications returns null for recipe without modifications', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      const mods = service.getModifications(recipe.id);
+      expect(mods).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('hasModifications returns false for recipe without modifications', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      expect(service.hasModifications(recipe.id)).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('setRecipeNote creates modification', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      const mod = service.setRecipeNote(recipe.id, 'My personal note');
+
+      expect(mod.userNotes).toBe('My personal note');
+      expect(service.hasModifications(recipe.id)).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('setRecipeNote throws for non-existent recipe', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      expect(() => service.setRecipeNote('non-existent-id', 'Note')).toThrow();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('addIngredientOverride creates override', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      const mod = service.addIngredientOverride(recipe.id, 'butter', 'olive oil');
+
+      expect(mod.ingredientOverrides.length).toBe(1);
+      expect(mod.ingredientOverrides[0].original).toBe('butter');
+      expect(mod.ingredientOverrides[0].replacement).toBe('olive oil');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('addIngredientOverride throws for non-existent recipe', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      expect(() =>
+        service.addIngredientOverride('non-existent-id', 'butter', 'oil')
+      ).toThrow();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('removeIngredientOverride removes override', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      service.addIngredientOverride(recipe.id, 'butter', 'olive oil');
+      const mod = service.removeIngredientOverride(recipe.id, 'butter');
+
+      expect(mod!.ingredientOverrides.length).toBe(0);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('removeIngredientOverride returns null for recipe without modifications', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      const result = service.removeIngredientOverride(recipe.id, 'butter');
+      expect(result).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('clearModifications removes all modifications', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      service.setRecipeNote(recipe.id, 'Note');
+      service.addIngredientOverride(recipe.id, 'butter', 'oil');
+
+      const deleted = service.clearModifications(recipe.id);
+
+      expect(deleted).toBe(true);
+      expect(service.hasModifications(recipe.id)).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('clearModifications returns false for recipe without modifications', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      const deleted = service.clearModifications(recipe.id);
+      expect(deleted).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('updateModifications creates/updates modifications', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      const mod = service.updateModifications(recipe.id, {
+        userNotes: 'My notes',
+        ingredientOverrides: [{ original: 'butter', replacement: 'oil' }],
+        instructionNotes: 'Cook longer',
+      });
+
+      expect(mod.userNotes).toBe('My notes');
+      expect(mod.ingredientOverrides.length).toBe(1);
+      expect(mod.instructionNotes).toBe('Cook longer');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('updateModifications throws for non-existent recipe', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      expect(() =>
+        service.updateModifications('non-existent-id', { userNotes: 'Note' })
+      ).toThrow();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('getRecipeWithModifications returns recipe and modifications', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      service.setRecipeNote(recipe.id, 'My note');
+
+      const result = service.getRecipeWithModifications(recipe.id);
+
+      expect(result.recipe).not.toBeNull();
+      expect(result.recipe!.title).toBe('Recipe');
+      expect(result.modifications).not.toBeNull();
+      expect(result.modifications!.userNotes).toBe('My note');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('getRecipeWithModifications returns null modifications when none exist', () => {
+    const { service, cleanup } = setupTestDb();
+    try {
+      const recipe = service.createRecipe({
+        title: 'Recipe',
+        instructions: 'Cook',
+        servings: 4,
+        description: null,
+        prepTimeMinutes: null,
+        cookTimeMinutes: null,
+        sourceUrl: null,
+        sourceType: null,
+        cuisine: null,
+        difficulty: null,
+      });
+
+      const result = service.getRecipeWithModifications(recipe.id);
+
+      expect(result.recipe).not.toBeNull();
+      expect(result.modifications).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+});
+

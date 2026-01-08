@@ -7,11 +7,13 @@ import {
   PlanService,
   RecipeService,
   SuggestionService,
+  PrepDayService,
   type MealType,
   type SlotType,
   type WeeklyPlanWithItems,
   type RecipeSuggestion,
   type PlanItem,
+  type PrepDaySummary,
 } from '@meals/core';
 import {
   printJson,
@@ -47,6 +49,15 @@ function getSuggestionService(dbPath?: string): SuggestionService {
   const db = getDb({ dbPath });
   migrate(db, getDefaultMigrationsDir());
   return new SuggestionService(db);
+}
+
+/**
+ * Initialize database and return a PrepDayService instance
+ */
+function getPrepDayService(dbPath?: string): PrepDayService {
+  const db = getDb({ dbPath });
+  migrate(db, getDefaultMigrationsDir());
+  return new PrepDayService(db);
 }
 
 /**
@@ -185,6 +196,36 @@ function getSlotDisplayText(
 }
 
 /**
+ * Build display text for a slot including side dishes
+ */
+function getSlotDisplayWithSides(
+  mainItem: PlanItem | undefined,
+  sideItems: PlanItem[],
+  recipeService: RecipeService,
+  planItems: PlanItem[]
+): string[] {
+  const lines: string[] = [];
+
+  if (mainItem) {
+    const mainText = getSlotDisplayText(mainItem, recipeService, planItems);
+    if (mainText !== '-') {
+      lines.push(mainText);
+    }
+
+    // Add side dishes below main
+    for (const side of sideItems) {
+      if (side.recipeId) {
+        const recipe = recipeService.getRecipe(side.recipeId);
+        const sideName = recipe?.title ?? side.recipeId;
+        lines.push(`  + ${sideName}`);
+      }
+    }
+  }
+
+  return lines.length > 0 ? lines : ['-'];
+}
+
+/**
  * Format plan as a table for display
  */
 function displayPlanTable(plan: WeeklyPlanWithItems, recipeService: RecipeService): void {
@@ -194,27 +235,41 @@ function displayPlanTable(plan: WeeklyPlanWithItems, recipeService: RecipeServic
 
   const planItems = plan.items || [];
 
-  // Build a lookup for items by day and meal type
-  const itemsBySlot = new Map<string, string>();
+  // Separate main dishes from sides and build a map of sides by main item id
+  const mainItems: PlanItem[] = [];
+  const sidesByMainId = new Map<string, PlanItem[]>();
+
   for (const item of planItems) {
-    const key = `${item.dayOfWeek}-${item.mealType}`;
-    const displayText = getSlotDisplayText(item, recipeService, planItems);
-    if (displayText !== '-') {
-      itemsBySlot.set(key, displayText);
+    if (item.isSideDish && item.mainItemId) {
+      const sides = sidesByMainId.get(item.mainItemId) || [];
+      sides.push(item);
+      sidesByMainId.set(item.mainItemId, sides);
+    } else {
+      mainItems.push(item);
     }
   }
 
-  // Calculate column widths
+  // Build a lookup for items by day and meal type, including sides
+  const itemsBySlot = new Map<string, string[]>();
+  for (const item of mainItems) {
+    const key = `${item.dayOfWeek}-${item.mealType}`;
+    const sides = sidesByMainId.get(item.id) || [];
+    const displayLines = getSlotDisplayWithSides(item, sides, recipeService, planItems);
+    itemsBySlot.set(key, displayLines);
+  }
+
+  // Calculate column widths based on the longest line in each slot
   const dayWidth = 3;
   const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner'];
   const mealWidths: Record<MealType, number> = { breakfast: 9, lunch: 5, dinner: 6 };
 
-  // Find max widths based on display text
   for (let day = 1; day <= 7; day++) {
     for (const meal of mealTypes) {
       const key = `${day}-${meal}`;
-      const value = itemsBySlot.get(key) ?? '-';
-      mealWidths[meal] = Math.max(mealWidths[meal], value.length);
+      const lines = itemsBySlot.get(key) ?? ['-'];
+      for (const line of lines) {
+        mealWidths[meal] = Math.max(mealWidths[meal], line.length);
+      }
     }
   }
 
@@ -225,15 +280,25 @@ function displayPlanTable(plan: WeeklyPlanWithItems, recipeService: RecipeServic
   console.log(header);
   console.log(separator);
 
-  // Print rows
+  // Print rows - handle multi-line cells for side dishes
   for (let day = 1; day <= 7; day++) {
     const dayName = getDayName(day);
-    const breakfast = itemsBySlot.get(`${day}-breakfast`) ?? '-';
-    const lunch = itemsBySlot.get(`${day}-lunch`) ?? '-';
-    const dinner = itemsBySlot.get(`${day}-dinner`) ?? '-';
+    const breakfastLines = itemsBySlot.get(`${day}-breakfast`) ?? ['-'];
+    const lunchLines = itemsBySlot.get(`${day}-lunch`) ?? ['-'];
+    const dinnerLines = itemsBySlot.get(`${day}-dinner`) ?? ['-'];
 
-    const row = `| ${dayName.padEnd(dayWidth)} | ${breakfast.padEnd(mealWidths.breakfast)} | ${lunch.padEnd(mealWidths.lunch)} | ${dinner.padEnd(mealWidths.dinner)} |`;
-    console.log(row);
+    // Calculate max lines needed for this row
+    const maxLines = Math.max(breakfastLines.length, lunchLines.length, dinnerLines.length);
+
+    for (let lineIdx = 0; lineIdx < maxLines; lineIdx++) {
+      const dayCell = lineIdx === 0 ? dayName : '';
+      const breakfast = breakfastLines[lineIdx] ?? '';
+      const lunch = lunchLines[lineIdx] ?? '';
+      const dinner = dinnerLines[lineIdx] ?? '';
+
+      const row = `| ${dayCell.padEnd(dayWidth)} | ${breakfast.padEnd(mealWidths.breakfast)} | ${lunch.padEnd(mealWidths.lunch)} | ${dinner.padEnd(mealWidths.dinner)} |`;
+      console.log(row);
+    }
   }
 
   console.log('');
@@ -635,6 +700,7 @@ planCommand
   .option('--dining-out', 'Mark this slot as dining out (no recipe needed)')
   .option('--skip', 'Mark this slot as skipped')
   .option('--leftovers-from <day-meal>', 'Mark as leftovers from another meal (e.g., "mon dinner")')
+  .option('--batch <batch-id>', 'Link this meal to a prep batch')
   .action((week: string, day: string, meal: string, recipeId: string | undefined, options, command) => {
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
 
@@ -660,6 +726,7 @@ planCommand
       // Determine slot type based on flags
       let slotType: SlotType = 'recipe';
       let leftoversSourceId: string | null = null;
+      let batchId: string | null = options.batch ?? null;
       let displayMessage = '';
       const dayName = getDayName(dayOfWeek);
 
@@ -707,6 +774,9 @@ planCommand
           process.exit(1);
         }
         displayMessage = `Set ${dayName} ${mealType} to "${recipe.title}" for week ${isoWeek}`;
+        if (batchId) {
+          displayMessage += ` (linked to batch)`;
+        }
       }
 
       // Set the meal
@@ -719,7 +789,8 @@ planCommand
         options.notes,
         'user',
         slotType,
-        leftoversSourceId
+        leftoversSourceId,
+        batchId
       );
 
       if (!item) {
@@ -1105,6 +1176,220 @@ planCommand
 
           console.log('');
         }
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// ADD-SIDE command
+planCommand
+  .command('add-side <week> <day> <meal> <recipe-id>')
+  .description('Add a side dish to an existing meal (day: mon-sun, meal: breakfast/lunch/dinner)')
+  .option('-s, --servings <n>', 'Number of servings', '2')
+  .option('-n, --notes <text>', 'Notes for this side dish')
+  .action((week: string, day: string, meal: string, recipeId: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const isoWeek = parseWeek(week);
+      const dayOfWeek = parseDay(day);
+      const mealType = parseMealType(meal);
+      const servings = parseInt(options.servings, 10);
+
+      const service = getPlanService(globalOpts.db);
+      const recipeService = getRecipeService(globalOpts.db);
+
+      // Get the plan
+      const plan = service.getPlanByWeek(isoWeek);
+      if (!plan) {
+        printError(`No plan found for week ${isoWeek}. Create one first with: meals plan create ${week}`);
+        process.exit(1);
+      }
+
+      // Find the main dish for this slot
+      const mainItem = service.getMainMealBySlot(plan.id, dayOfWeek, mealType);
+      if (!mainItem) {
+        printError(`No main dish found at ${getDayName(dayOfWeek)} ${mealType}. Set a main dish first with: meals plan set ${week} ${day} ${meal} <recipe-id>`);
+        process.exit(1);
+      }
+
+      // Verify the side dish recipe exists
+      const recipe = recipeService.getRecipe(recipeId);
+      if (!recipe) {
+        printError(`Recipe not found: ${recipeId}`);
+        process.exit(1);
+      }
+
+      // Add the side dish
+      const side = service.addSide(
+        plan.id,
+        mainItem.id,
+        recipeId,
+        servings,
+        options.notes ?? null,
+        'user'
+      );
+
+      if (!side) {
+        printError('Failed to add side dish');
+        process.exit(1);
+      }
+
+      const dayName = getDayName(dayOfWeek);
+      const mainRecipe = mainItem.recipeId ? recipeService.getRecipe(mainItem.recipeId) : null;
+      const mainName = mainRecipe?.title ?? mainItem.recipeId ?? 'main dish';
+
+      if (globalOpts.json) {
+        printJson(side);
+      } else {
+        printSuccess(`Added "${recipe.title}" as a side to ${dayName} ${mealType} (${mainName}) for week ${isoWeek}`);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// REMOVE-SIDE command
+planCommand
+  .command('remove-side <side-id>')
+  .description('Remove a side dish by its ID')
+  .action((sideId: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const service = getPlanService(globalOpts.db);
+
+      const removed = service.removeSide(sideId, 'user');
+
+      if (!removed) {
+        printError(`Side dish not found or not removable: ${sideId}`);
+        process.exit(1);
+      }
+
+      if (globalOpts.json) {
+        printJson({ removed: true, sideId });
+      } else {
+        printSuccess(`Removed side dish ${sideId}`);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+/**
+ * Display prep day summary in a formatted way
+ */
+function displayPrepDaySummary(summary: PrepDaySummary): void {
+  console.log('');
+  console.log(`Prep Day Summary for Week ${summary.week}`);
+  console.log('='.repeat(50));
+  console.log('');
+
+  // Total time
+  const hours = Math.floor(summary.totalPrepTime / 60);
+  const minutes = summary.totalPrepTime % 60;
+  const timeStr = hours > 0
+    ? `${hours}h ${minutes}m`
+    : `${minutes} minutes`;
+  console.log(`Estimated Total Prep Time: ${timeStr}`);
+  console.log('');
+
+  // Batches section (if any)
+  if (summary.batches.length > 0) {
+    console.log('Prep Batches');
+    console.log('-'.repeat(30));
+    for (const batch of summary.batches) {
+      console.log(`  - ${batch.recipeTitle} (${batch.totalServings} servings)`);
+      if (batch.notes) {
+        console.log(`    Note: ${batch.notes}`);
+      }
+    }
+    console.log('');
+  }
+
+  // Recipes section
+  console.log('Recipes to Prep');
+  console.log('-'.repeat(30));
+  for (const recipe of summary.recipes) {
+    const prepInfo = recipe.prepTimeMinutes ? `${recipe.prepTimeMinutes} min` : 'time N/A';
+    const batchNote = recipe.needsFullPrep ? '' : ' (from batch)';
+    console.log(`  - ${recipe.title} x${recipe.mealCount} [${prepInfo}]${batchNote}`);
+  }
+  console.log('');
+
+  // Tasks section (sorted by priority)
+  if (summary.tasks.length > 0) {
+    console.log('Prep Tasks (in order)');
+    console.log('-'.repeat(30));
+    for (const task of summary.tasks) {
+      const timeEst = task.estimatedTime ? ` (~${task.estimatedTime} min)` : '';
+      console.log(`  ${task.taskType}${timeEst}:`);
+      for (const item of task.items) {
+        const recipeList = item.recipes.length <= 2
+          ? item.recipes.join(', ')
+          : `${item.recipes.slice(0, 2).join(', ')} +${item.recipes.length - 2} more`;
+        console.log(`    - ${item.ingredient}: ${item.quantity} (for: ${recipeList})`);
+      }
+    }
+    console.log('');
+  }
+
+  // Equipment section
+  if (summary.equipment.length > 0) {
+    console.log('Equipment Needed');
+    console.log('-'.repeat(30));
+    const equipmentLine = summary.equipment.join(', ');
+    console.log(`  ${equipmentLine}`);
+    console.log('');
+  }
+}
+
+// PREP command
+planCommand
+  .command('prep [week]')
+  .description('Show aggregated prep tasks for a designated prep day')
+  .action((week: string | undefined, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const prepDayService = getPrepDayService(globalOpts.db);
+
+      let isoWeek: string;
+
+      if (week) {
+        isoWeek = parseWeek(week);
+      } else {
+        // Default to this week
+        isoWeek = getIsoWeek(new Date());
+      }
+
+      const summary = prepDayService.generatePrepDay(isoWeek);
+
+      if (!summary) {
+        printError(`No plan found for week ${isoWeek}. Create one first with: meals plan create ${week ?? 'this-week'}`);
+        process.exit(1);
+      }
+
+      if (summary.recipes.length === 0) {
+        if (globalOpts.json) {
+          printJson(summary);
+        } else {
+          console.log('');
+          console.log(`Week ${isoWeek}: No meals planned yet.`);
+          console.log('Add meals with: meals plan set <week> <day> <meal> <recipe-id>');
+          console.log('');
+        }
+        return;
+      }
+
+      if (globalOpts.json) {
+        printJson(summary);
+      } else {
+        displayPrepDaySummary(summary);
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');

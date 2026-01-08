@@ -56,6 +56,8 @@ interface RecipeRow {
   cuisine: string | null;
   difficulty: string | null;
   is_favorite: number;
+  parent_recipe_id: string | null;
+  version_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -94,6 +96,8 @@ function rowToRecipe(row: RecipeRow): Recipe {
     cuisine: row.cuisine,
     difficulty: row.difficulty as Recipe['difficulty'],
     isFavorite: row.is_favorite === 1,
+    parentRecipeId: row.parent_recipe_id,
+    versionName: row.version_name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -577,5 +581,170 @@ export class RecipeRepository {
       .all() as { id: string }[];
 
     return rows.map((r) => r.id);
+  }
+
+  /**
+   * Fork a recipe to create a new version/variation.
+   *
+   * Creates a copy of the recipe with:
+   * - New UUID
+   * - parent_recipe_id pointing to the original
+   * - version_name set to the provided name
+   * - source_type set to 'variation'
+   * - source_url inherited from parent
+   * - All recipe_ingredients copied with new UUIDs
+   * - All recipe_tags copied
+   *
+   * @param id - The ID of the recipe to fork
+   * @param versionName - The name for this version (e.g., "sous vide", "vegan")
+   * @returns The newly created recipe version, or null if original not found
+   */
+  forkRecipe(id: string, versionName: string): RecipeWithRelations | null {
+    const original = this.getById(id);
+    if (!original) return null;
+
+    const newId = uuid();
+    const now = new Date().toISOString();
+
+    this.db.transaction(() => {
+      // Insert the forked recipe
+      this.db
+        .prepare(
+          `
+          INSERT INTO recipes (
+            id, title, description, instructions, servings,
+            prep_time_minutes, cook_time_minutes, source_url, source_type,
+            cuisine, difficulty, is_favorite, parent_recipe_id, version_name,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+        )
+        .run(
+          newId,
+          original.title,
+          original.description ?? null,
+          original.instructions,
+          original.servings,
+          original.prepTimeMinutes ?? null,
+          original.cookTimeMinutes ?? null,
+          original.sourceUrl ?? null,
+          'variation',
+          original.cuisine ?? null,
+          original.difficulty ?? null,
+          0, // is_favorite starts as false for the fork
+          id, // parent_recipe_id
+          versionName,
+          now,
+          now
+        );
+
+      // Copy recipe ingredients
+      if (original.ingredients && original.ingredients.length > 0) {
+        const insertIngredient = this.db.prepare(`
+          INSERT INTO recipe_ingredients (id, recipe_id, ingredient_id, quantity, unit, notes, optional)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        for (const ing of original.ingredients) {
+          insertIngredient.run(
+            uuid(),
+            newId,
+            ing.ingredientId,
+            ing.quantity,
+            ing.unit,
+            ing.notes,
+            ing.optional ? 1 : 0
+          );
+        }
+      }
+
+      // Copy recipe tags
+      if (original.tagIds && original.tagIds.length > 0) {
+        const insertTag = this.db.prepare(`
+          INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)
+        `);
+
+        for (const tagId of original.tagIds) {
+          insertTag.run(newId, tagId);
+        }
+      }
+    })();
+
+    return this.getById(newId)!;
+  }
+
+  /**
+   * Get all versions of a recipe (including the original).
+   *
+   * @param id - The ID of a recipe (can be parent or any version)
+   * @returns Array of all versions including the original, or empty array if not found
+   */
+  getVersions(id: string): RecipeWithRelations[] {
+    // First, find the root recipe (the one without a parent)
+    let rootId = id;
+    let currentRecipe = this.getById(id);
+
+    if (!currentRecipe) return [];
+
+    // Traverse up to find the root
+    while (currentRecipe?.parentRecipeId) {
+      rootId = currentRecipe.parentRecipeId;
+      currentRecipe = this.getById(rootId);
+    }
+
+    // If we couldn't find the root, just use the original id
+    if (!currentRecipe) {
+      rootId = id;
+    }
+
+    // Get the root recipe
+    const root = this.getById(rootId);
+    if (!root) return [];
+
+    // Get all direct versions of the root
+    const versionRows = this.db
+      .prepare('SELECT * FROM recipes WHERE parent_recipe_id = ?')
+      .all(rootId) as RecipeRow[];
+
+    // Build the result: root first, then versions
+    const results: RecipeWithRelations[] = [root];
+
+    for (const row of versionRows) {
+      const recipe = rowToRecipe(row);
+
+      // Fetch ingredients
+      const ingredientRows = this.db
+        .prepare('SELECT * FROM recipe_ingredients WHERE recipe_id = ?')
+        .all(row.id) as RecipeIngredientRow[];
+
+      const ingredients = ingredientRows.map(rowToRecipeIngredient);
+
+      // Fetch tag IDs
+      const tagRows = this.db
+        .prepare('SELECT tag_id FROM recipe_tags WHERE recipe_id = ?')
+        .all(row.id) as RecipeTagRow[];
+
+      const tagIds = tagRows.map((r) => r.tag_id);
+
+      results.push({
+        ...recipe,
+        ingredients,
+        tagIds,
+      });
+    }
+
+    return results;
+  }
+
+  /**
+   * Get the parent recipe for a version.
+   *
+   * @param id - The ID of a recipe version
+   * @returns The parent recipe, or null if this is not a version or parent not found
+   */
+  getParentRecipe(id: string): RecipeWithRelations | null {
+    const recipe = this.getById(id);
+    if (!recipe || !recipe.parentRecipeId) return null;
+    return this.getById(recipe.parentRecipeId);
   }
 }

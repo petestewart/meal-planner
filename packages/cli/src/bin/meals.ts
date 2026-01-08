@@ -8,6 +8,8 @@ import { prefsCommand } from '../commands/prefs.js';
 import { dbCommand } from '../commands/db.js';
 import { ingredientCommand } from '../commands/ingredient.js';
 import { pantryCommand } from '../commands/pantry.js';
+import { prepCommand } from '../commands/prep.js';
+import { substitutionCommand } from '../commands/substitution.js';
 
 const program = new Command();
 
@@ -28,5 +30,7 @@ program.addCommand(prefsCommand);
 program.addCommand(dbCommand);
 program.addCommand(ingredientCommand);
 program.addCommand(pantryCommand);
+program.addCommand(prepCommand);
+program.addCommand(substitutionCommand);
 
 program.parse();

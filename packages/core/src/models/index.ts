@@ -5,9 +5,13 @@ export {
   IngredientSchema,
   CreateIngredientSchema,
   UpdateIngredientSchema,
+  StoreSectionEnum,
+  STORE_SECTIONS,
+  isValidStoreSection,
   type Ingredient,
   type CreateIngredient,
   type UpdateIngredient,
+  type StoreSection,
 } from './ingredient.js';
 
 // Tag models
@@ -118,3 +122,30 @@ export {
   type CreatePantryItem,
   type UpdatePantryItem,
 } from './pantry.js';
+
+// Prep batch models
+export {
+  PrepBatchSchema,
+  CreatePrepBatchSchema,
+  UpdatePrepBatchSchema,
+  PrepBatchWithRecipeSchema,
+  PrepBatchWithRemainingSchema,
+  type PrepBatch,
+  type CreatePrepBatch,
+  type UpdatePrepBatch,
+  type PrepBatchWithRecipe,
+  type PrepBatchWithRemaining,
+} from './prep-batch.js';
+
+// Substitution models
+export {
+  SubstitutionSchema,
+  CreateSubstitutionSchema,
+  UpdateSubstitutionSchema,
+  DIETARY_TAGS,
+  isValidDietaryTag,
+  type Substitution,
+  type CreateSubstitution,
+  type UpdateSubstitution,
+  type DietaryTag,
+} from './substitution.js';

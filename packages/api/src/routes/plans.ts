@@ -14,6 +14,7 @@ import { z } from 'zod';
 import {
   PlanService,
   SuggestionService,
+  PrepDayService,
   getDb,
   IsoWeekSchema,
   MealTypeEnum,
@@ -118,6 +119,7 @@ export async function planRoutes(server: FastifyInstance): Promise<void> {
   const db = getDb();
   const planService = new PlanService(db);
   const suggestionService = new SuggestionService(db);
+  const prepDayService = new PrepDayService(db);
 
   /**
    * POST /api/plans - Create plan
@@ -429,6 +431,43 @@ export async function planRoutes(server: FastifyInstance): Promise<void> {
       };
 
       return reply.send(successResponse(response));
+    }
+  );
+
+  /**
+   * GET /api/plans/:week/prep-day - Get prep day summary
+   *
+   * Returns aggregated prep tasks for the week's plan, including:
+   * - Total estimated prep time
+   * - Prep batches linked to the plan
+   * - Prep tasks grouped by type (chop, marinate, etc.)
+   * - Equipment needed
+   * - Recipe summaries with prep info
+   */
+  server.get(
+    '/api/plans/:week/prep-day',
+    async (
+      request: FastifyRequest<{ Params: { week: string } }>,
+      reply: FastifyReply
+    ) => {
+      const { week } = request.params;
+
+      // Validate week format
+      const weekResult = IsoWeekSchema.safeParse(week);
+      if (!weekResult.success) {
+        throw new ApiError(
+          'VALIDATION_ERROR',
+          'Invalid week format. Expected YYYY-Www (e.g., 2025-W02)'
+        );
+      }
+
+      const summary = prepDayService.generatePrepDay(week);
+
+      if (!summary) {
+        throw new ApiError('NOT_FOUND', `Plan for week '${week}' not found`);
+      }
+
+      return reply.send(successResponse(summary));
     }
   );
 }
