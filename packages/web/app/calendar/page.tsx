@@ -128,6 +128,7 @@ function CalendarContent() {
           dayOfWeek={selectedSlot.day}
           mealType={selectedSlot.mealType}
           defaultServings={defaultServings}
+          week={week}
         />
       )}
     </div>

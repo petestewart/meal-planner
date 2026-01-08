@@ -11,6 +11,7 @@ import {
   Minus,
   Plus,
   Loader2,
+  Package,
 } from 'lucide-react';
 import {
   Dialog,
@@ -23,8 +24,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useRecipes } from '@/lib/queries';
-import { RecipeWithRelations, MealType, DayOfWeek, SlotType } from '@/types/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useRecipes, usePlan } from '@/lib/queries';
+import { RecipeWithRelations, MealType, DayOfWeek, SlotType, PlanItem } from '@/types/api';
 import { cn } from '@/lib/utils';
 
 // Day names for display
@@ -52,6 +60,7 @@ interface RecipeSelectorProps {
   dayOfWeek: DayOfWeek;
   mealType: MealType;
   defaultServings?: number;
+  week: string;
 }
 
 export interface RecipeSelection {
@@ -86,18 +95,23 @@ export function RecipeSelector({
   dayOfWeek,
   mealType,
   defaultServings = 2,
+  week,
 }: RecipeSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeWithRelations | null>(null);
   const [selectedSlotType, setSelectedSlotType] = useState<SlotType | null>(null);
   const [servings, setServings] = useState(defaultServings);
-  const [diningOutNotes, setDiningOutNotes] = useState('');
+  const [notes, setNotes] = useState('');
+  const [leftoversSourceId, setLeftoversSourceId] = useState<string | null>(null);
 
   // Fetch all recipes
   const { data: recipesData, isLoading: isLoadingRecipes } = useRecipes(
     { limit: 100 },
     { enabled: open }
   );
+
+  // Fetch current week's plan for leftovers source selection
+  const { data: planData } = usePlan(week);
 
   // Filter and sort recipes
   const { favorites, otherRecipes } = useMemo(() => {
@@ -121,6 +135,29 @@ export function RecipeSelector({
     return { favorites: favs, otherRecipes: others };
   }, [recipesData?.recipes, searchQuery]);
 
+  // Get meals with recipes for leftovers source selection
+  const mealsWithRecipes = useMemo(() => {
+    if (!planData?.items || !recipesData?.recipes) return [];
+
+    const recipeMap = new Map(recipesData.recipes.map(r => [r.id, r]));
+
+    return planData.items
+      .filter((item): item is PlanItem & { recipeId: string } =>
+        item.recipeId !== null && item.slotType === 'recipe'
+      )
+      .map(item => ({
+        ...item,
+        recipe: recipeMap.get(item.recipeId),
+      }))
+      .filter(item => item.recipe)
+      .sort((a, b) => {
+        // Sort by day, then by meal type
+        if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
+        const mealOrder = { breakfast: 0, lunch: 1, dinner: 2 };
+        return mealOrder[a.mealType] - mealOrder[b.mealType];
+      });
+  }, [planData?.items, recipesData?.recipes]);
+
   // Handle recipe selection
   const handleRecipeClick = useCallback((recipe: RecipeWithRelations) => {
     setSelectedRecipe(recipe);
@@ -132,9 +169,12 @@ export function RecipeSelector({
   const handleSpecialOptionClick = useCallback((slotType: SlotType) => {
     setSelectedSlotType(slotType);
     setSelectedRecipe(null);
-    // Clear notes when switching away from dining out
-    if (slotType !== 'dining_out') {
-      setDiningOutNotes('');
+    // Clear notes and leftovers source when switching to different types
+    if (slotType !== 'dining_out' && slotType !== 'leftovers') {
+      setNotes('');
+    }
+    if (slotType !== 'leftovers') {
+      setLeftoversSourceId(null);
     }
   }, []);
 
@@ -151,7 +191,8 @@ export function RecipeSelector({
         recipeId: null,
         servings: defaultServings,
         slotType: selectedSlotType,
-        notes: selectedSlotType === 'dining_out' ? diningOutNotes : undefined,
+        notes: (selectedSlotType === 'dining_out' || selectedSlotType === 'leftovers') ? notes : undefined,
+        leftoversSourceId: selectedSlotType === 'leftovers' ? leftoversSourceId : undefined,
       });
     }
     // Reset state after selection
@@ -159,8 +200,9 @@ export function RecipeSelector({
     setSelectedRecipe(null);
     setSelectedSlotType(null);
     setServings(defaultServings);
-    setDiningOutNotes('');
-  }, [selectedRecipe, selectedSlotType, servings, defaultServings, onSelect, diningOutNotes]);
+    setNotes('');
+    setLeftoversSourceId(null);
+  }, [selectedRecipe, selectedSlotType, servings, defaultServings, onSelect, notes, leftoversSourceId]);
 
   // Handle cancel
   const handleCancel = useCallback(() => {
@@ -168,7 +210,8 @@ export function RecipeSelector({
     setSelectedRecipe(null);
     setSelectedSlotType(null);
     setServings(defaultServings);
-    setDiningOutNotes('');
+    setNotes('');
+    setLeftoversSourceId(null);
     onOpenChange(false);
   }, [defaultServings, onOpenChange]);
 
@@ -179,7 +222,8 @@ export function RecipeSelector({
       setSelectedRecipe(null);
       setSelectedSlotType(null);
       setServings(defaultServings);
-      setDiningOutNotes('');
+      setNotes('');
+      setLeftoversSourceId(null);
     }
     onOpenChange(newOpen);
   }, [defaultServings, onOpenChange]);
@@ -244,10 +288,62 @@ export function RecipeSelector({
             <Input
               id="dining-out-notes"
               placeholder="Enter restaurant name..."
-              value={diningOutNotes}
-              onChange={(e) => setDiningOutNotes(e.target.value)}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               aria-label="Restaurant or dining out notes"
             />
+          </div>
+        )}
+
+        {/* Leftovers Options */}
+        {selectedSlotType === 'leftovers' && (
+          <div className="space-y-3">
+            {/* Source meal selector */}
+            <div className="space-y-2">
+              <label htmlFor="leftovers-source" className="text-sm font-medium">
+                From which meal? (optional)
+              </label>
+              <Select
+                value={leftoversSourceId ?? ''}
+                onValueChange={(value) => setLeftoversSourceId(value || null)}
+              >
+                <SelectTrigger id="leftovers-source">
+                  <SelectValue placeholder="Select a meal..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {mealsWithRecipes.length > 0 ? (
+                    mealsWithRecipes.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        <div className="flex items-center gap-2">
+                          <Package className="h-3 w-3 text-muted-foreground" />
+                          <span>
+                            {DAY_NAMES[item.dayOfWeek as DayOfWeek]} {MEAL_TYPE_NAMES[item.mealType]} - {item.recipe?.title}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      No meals with recipes this week
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Notes input */}
+            <div className="space-y-2">
+              <label htmlFor="leftovers-notes" className="text-sm font-medium">
+                Notes (optional)
+              </label>
+              <Input
+                id="leftovers-notes"
+                placeholder="e.g., 'Last night's pasta' or 'Freezer meal'"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                aria-label="Leftovers notes"
+              />
+            </div>
           </div>
         )}
 

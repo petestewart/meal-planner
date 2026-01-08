@@ -91,7 +91,7 @@ export function MealSlot({
             <span className={cn('text-sm font-medium', slotConfig.textClass)}>
               {formatSlotType(planItem.slotType)}
             </span>
-            {planItem.slotType === 'dining_out' && planItem.notes && (
+            {(planItem.slotType === 'dining_out' || planItem.slotType === 'leftovers') && planItem.notes && (
               <span className="text-xs text-muted-foreground truncate">{planItem.notes}</span>
             )}
           </div>

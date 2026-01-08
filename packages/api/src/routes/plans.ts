@@ -20,6 +20,7 @@ import {
   MealTypeEnum,
   PlanStatusEnum,
   DayOfWeekSchema,
+  SlotTypeEnum,
   type MealType,
   type RecipeSuggestion,
 } from '@meals/core';
@@ -41,6 +42,8 @@ const SetMealBodySchema = z.object({
   recipeId: z.string().min(1).nullable(),
   servings: z.number().int().positive().optional(),
   notes: z.string().optional(),
+  slotType: SlotTypeEnum.optional(),
+  leftoversSourceId: z.string().min(1).nullable().optional(),
 });
 
 /**
@@ -231,7 +234,7 @@ export async function planRoutes(server: FastifyInstance): Promise<void> {
         );
       }
 
-      const { recipeId, servings, notes } = bodyResult.data;
+      const { recipeId, servings, notes, slotType, leftoversSourceId } = bodyResult.data;
 
       try {
         const item = planService.setMeal(
@@ -240,7 +243,10 @@ export async function planRoutes(server: FastifyInstance): Promise<void> {
           mealType,
           recipeId,
           servings,
-          notes
+          notes,
+          undefined, // actor - use default
+          slotType ?? 'recipe',
+          leftoversSourceId ?? null
         );
 
         if (!item) {
