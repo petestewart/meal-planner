@@ -51,6 +51,9 @@ interface PlanItemRow {
   slot_type: string | null;
   leftovers_source_id: string | null;
   was_made: number | null;
+  batch_id: string | null;
+  is_side_dish: number | null;
+  main_item_id: string | null;
 }
 
 /**
@@ -83,6 +86,9 @@ function rowToPlanItem(row: PlanItemRow): PlanItem {
     slotType: (row.slot_type ?? 'recipe') as SlotType,
     leftoversSourceId: row.leftovers_source_id,
     wasMade: row.was_made === 1,
+    batchId: row.batch_id,
+    isSideDish: row.is_side_dish === 1,
+    mainItemId: row.main_item_id,
   };
 }
 
@@ -291,6 +297,7 @@ export class PlanRepository {
    *
    * Uses INSERT OR REPLACE to handle the unique constraint on (plan_id, day_of_week, meal_type).
    * If a meal already exists for that slot, it will be replaced.
+   * Note: For side dishes, use addSide() method instead.
    */
   setMeal(
     planId: string,
@@ -300,27 +307,63 @@ export class PlanRepository {
     servings: number = 2,
     notes: string | null = null,
     slotType: SlotType = 'recipe',
-    leftoversSourceId: string | null = null
+    leftoversSourceId: string | null = null,
+    batchId: string | null = null,
+    isSideDish: boolean = false,
+    mainItemId: string | null = null
   ): PlanItem {
-    // Check if a meal already exists at this slot
-    const existing = this.db
-      .prepare(
-        `SELECT id FROM plan_items WHERE plan_id = ? AND day_of_week = ? AND meal_type = ?`
-      )
-      .get(planId, dayOfWeek, mealType) as { id: string } | undefined;
-
-    const id = existing?.id ?? uuid();
+    // Check if a meal already exists at this slot (only for main dishes, not side dishes)
+    let id: string;
+    if (isSideDish) {
+      // Side dishes always get a new ID (don't replace main dish)
+      id = uuid();
+    } else {
+      const existing = this.db
+        .prepare(
+          `SELECT id FROM plan_items WHERE plan_id = ? AND day_of_week = ? AND meal_type = ? AND is_side_dish = 0`
+        )
+        .get(planId, dayOfWeek, mealType) as { id: string } | undefined;
+      id = existing?.id ?? uuid();
+    }
 
     this.db
       .prepare(
         `
-        INSERT OR REPLACE INTO plan_items (id, plan_id, recipe_id, day_of_week, meal_type, servings, notes, slot_type, leftovers_source_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO plan_items (id, plan_id, recipe_id, day_of_week, meal_type, servings, notes, slot_type, leftovers_source_id, batch_id, is_side_dish, main_item_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
       )
-      .run(id, planId, recipeId, dayOfWeek, mealType, servings, notes, slotType, leftoversSourceId);
+      .run(id, planId, recipeId, dayOfWeek, mealType, servings, notes, slotType, leftoversSourceId, batchId, isSideDish ? 1 : 0, mainItemId);
 
-    return this.getMealBySlot(planId, dayOfWeek, mealType)!;
+    return this.getMealById(id)!;
+  }
+
+  /**
+   * Update the batch_id for a plan item
+   */
+  setBatchId(planItemId: string, batchId: string | null): PlanItem | null {
+    const existing = this.getMealById(planItemId);
+    if (!existing) return null;
+
+    this.db
+      .prepare('UPDATE plan_items SET batch_id = ? WHERE id = ?')
+      .run(batchId, planItemId);
+
+    return this.getMealById(planItemId);
+  }
+
+  /**
+   * Get all plan items linked to a specific batch
+   */
+  getMealsByBatchId(batchId: string): PlanItem[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM plan_items WHERE batch_id = ? ORDER BY day_of_week,
+         CASE meal_type WHEN 'breakfast' THEN 1 WHEN 'lunch' THEN 2 WHEN 'dinner' THEN 3 END`
+      )
+      .all(batchId) as PlanItemRow[];
+
+    return rows.map(rowToPlanItem);
   }
 
   /**
@@ -375,6 +418,98 @@ export class PlanRepository {
     const row = this.db
       .prepare('SELECT * FROM plan_items WHERE id = ?')
       .get(id) as PlanItemRow | undefined;
+
+    if (!row) return null;
+
+    return rowToPlanItem(row);
+  }
+
+  // ============================================
+  // Side Dish Methods
+  // ============================================
+
+  /**
+   * Add a side dish to an existing main dish meal
+   *
+   * @param planId - The plan ID
+   * @param mainItemId - The ID of the main dish this side belongs to
+   * @param recipeId - The recipe ID for the side dish
+   * @param servings - Number of servings (defaults to 2)
+   * @param notes - Optional notes
+   * @returns The created side dish plan item
+   */
+  addSide(
+    planId: string,
+    mainItemId: string,
+    recipeId: string,
+    servings: number = 2,
+    notes: string | null = null
+  ): PlanItem | null {
+    // Verify main item exists and is not a side dish itself
+    const mainItem = this.getMealById(mainItemId);
+    if (!mainItem) return null;
+    if (mainItem.isSideDish) return null; // Cannot add side to a side
+
+    const id = uuid();
+
+    this.db
+      .prepare(
+        `
+        INSERT INTO plan_items (id, plan_id, recipe_id, day_of_week, meal_type, servings, notes, slot_type, is_side_dish, main_item_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'recipe', 1, ?)
+      `
+      )
+      .run(id, planId, recipeId, mainItem.dayOfWeek, mainItem.mealType, servings, notes, mainItemId);
+
+    return this.getMealById(id);
+  }
+
+  /**
+   * Get all side dishes for a main dish
+   *
+   * @param mainItemId - The ID of the main dish
+   * @returns Array of side dish plan items
+   */
+  getSidesForMeal(mainItemId: string): PlanItem[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM plan_items WHERE main_item_id = ? ORDER BY id`
+      )
+      .all(mainItemId) as PlanItemRow[];
+
+    return rows.map(rowToPlanItem);
+  }
+
+  /**
+   * Remove a side dish
+   *
+   * @param sideItemId - The ID of the side dish to remove
+   * @returns true if removed, false if not found or not a side dish
+   */
+  removeSide(sideItemId: string): boolean {
+    const item = this.getMealById(sideItemId);
+    if (!item || !item.isSideDish) return false;
+
+    const result = this.db
+      .prepare('DELETE FROM plan_items WHERE id = ? AND is_side_dish = 1')
+      .run(sideItemId);
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Get the main dish for a slot (excluding side dishes)
+   */
+  getMainMealBySlot(
+    planId: string,
+    dayOfWeek: number,
+    mealType: MealType
+  ): PlanItem | null {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM plan_items WHERE plan_id = ? AND day_of_week = ? AND meal_type = ? AND (is_side_dish = 0 OR is_side_dish IS NULL)`
+      )
+      .get(planId, dayOfWeek, mealType) as PlanItemRow | undefined;
 
     if (!row) return null;
 

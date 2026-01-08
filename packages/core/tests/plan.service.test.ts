@@ -621,3 +621,485 @@ test('supports all actor types', () => {
   }
 });
 
+// =====================
+// Plan Completion Tests
+// =====================
+
+test('completePlan marks plan as completed', () => {
+  const { service, cleanup } = setupTestDb();
+  try {
+    const plan = service.createPlan({
+      week: '2025-W40',
+      status: 'active',
+      notes: null,
+    });
+
+    const completed = service.completePlan(plan.id);
+    expect(completed).toBeDefined();
+    expect(completed.status).toBe('completed');
+    expect(completed.completedAt).toBeDefined();
+  } finally {
+    cleanup();
+  }
+});
+
+test('completePlan creates audit log entry', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const plan = service.createPlan({
+      week: '2025-W41',
+      status: 'active',
+      notes: null,
+    });
+
+    service.completePlan(plan.id, 'user');
+
+    const auditEntries = getAuditEntries(db, plan.id);
+    expect(auditEntries.length).toBe(2); // create + complete
+    expect(auditEntries[0].action).toBe('update');
+
+    const details = JSON.parse(auditEntries[0].details!);
+    expect(details.action).toBe('complete');
+    expect(details.completedAt).toBeDefined();
+  } finally {
+    cleanup();
+  }
+});
+
+test('completePlan returns null for non-existent plan', () => {
+  const { service, cleanup } = setupTestDb();
+  try {
+    const result = service.completePlan('non-existent-id');
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('completePlan returns null for already completed plan', () => {
+  const { service, cleanup } = setupTestDb();
+  try {
+    const plan = service.createPlan({
+      week: '2025-W42',
+      status: 'active',
+      notes: null,
+    });
+
+    // Complete first time
+    service.completePlan(plan.id);
+
+    // Try to complete again
+    const result = service.completePlan(plan.id);
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getCompletedPlans returns completed plans ordered by completion date', () => {
+  const { service, cleanup } = setupTestDb();
+  try {
+    // Create and complete several plans
+    const plan1 = service.createPlan({ week: '2025-W43', status: 'active', notes: null });
+    const plan2 = service.createPlan({ week: '2025-W44', status: 'active', notes: null });
+    const plan3 = service.createPlan({ week: '2025-W45', status: 'draft', notes: null }); // Not completed
+
+    service.completePlan(plan1.id);
+    service.completePlan(plan2.id);
+
+    const completedPlans = service.getCompletedPlans();
+    expect(completedPlans.length).toBe(2);
+
+    // Should be ordered by completion date descending (most recent first)
+    expect(completedPlans[0].id).toBe(plan2.id);
+    expect(completedPlans[1].id).toBe(plan1.id);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getCompletedPlans respects limit parameter', () => {
+  const { service, cleanup } = setupTestDb();
+  try {
+    const plan1 = service.createPlan({ week: '2025-W46', status: 'active', notes: null });
+    const plan2 = service.createPlan({ week: '2025-W47', status: 'active', notes: null });
+    const plan3 = service.createPlan({ week: '2025-W48', status: 'active', notes: null });
+
+    service.completePlan(plan1.id);
+    service.completePlan(plan2.id);
+    service.completePlan(plan3.id);
+
+    const completedPlans = service.getCompletedPlans(2);
+    expect(completedPlans.length).toBe(2);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getCompletedPlans returns empty array when no plans completed', () => {
+  const { service, cleanup } = setupTestDb();
+  try {
+    service.createPlan({ week: '2025-W49', status: 'draft', notes: null });
+
+    const completedPlans = service.getCompletedPlans();
+    expect(completedPlans.length).toBe(0);
+  } finally {
+    cleanup();
+  }
+});
+
+// =====================
+// Mark Meal As Made Tests
+// =====================
+
+test('markMealAsMade marks meal as made', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2025-W50',
+      status: 'active',
+      notes: null,
+    });
+
+    service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+
+    const result = service.markMealAsMade(plan.id, 1, 'dinner', true);
+    expect(result).toBeDefined();
+    expect(result.wasMade).toBe(true);
+  } finally {
+    cleanup();
+  }
+});
+
+test('markMealAsMade creates audit log entry', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2025-W51',
+      status: 'active',
+      notes: null,
+    });
+
+    const meal = service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+    service.markMealAsMade(plan.id, 1, 'dinner', true, 'user');
+
+    const auditEntries = getAuditEntries(db, meal.id);
+    expect(auditEntries.length).toBe(2); // setMeal + markMealAsMade
+
+    const details = JSON.parse(auditEntries[0].details!);
+    expect(details.action).toBe('mark_made');
+    expect(details.wasMade).toBe(true);
+  } finally {
+    cleanup();
+  }
+});
+
+test('markMealAsMade can unmark meal as made', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2025-W52',
+      status: 'active',
+      notes: null,
+    });
+
+    service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+
+    // Mark as made
+    service.markMealAsMade(plan.id, 1, 'dinner', true);
+
+    // Unmark
+    const result = service.markMealAsMade(plan.id, 1, 'dinner', false);
+    expect(result).toBeDefined();
+    expect(result.wasMade).toBe(false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('markMealAsMade returns null for non-existent meal', () => {
+  const { service, cleanup } = setupTestDb();
+  try {
+    const plan = service.createPlan({
+      week: '2026-W01',
+      status: 'active',
+      notes: null,
+    });
+
+    const result = service.markMealAsMade(plan.id, 1, 'dinner', true);
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('markMealAsMade logs unmark_made action', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2026-W02',
+      status: 'active',
+      notes: null,
+    });
+
+    const meal = service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+    service.markMealAsMade(plan.id, 1, 'dinner', true);
+    service.markMealAsMade(plan.id, 1, 'dinner', false);
+
+    const auditEntries = getAuditEntries(db, meal.id);
+    const lastEntry = auditEntries[0];
+
+    const details = JSON.parse(lastEntry.details!);
+    expect(details.action).toBe('unmark_made');
+    expect(details.wasMade).toBe(false);
+  } finally {
+    cleanup();
+  }
+});
+
+// =====================
+// getMadeMeals Tests
+// =====================
+
+test('getMadeMeals returns meals marked as made from completed plans', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2026-W03',
+      status: 'active',
+      notes: null,
+    });
+
+    service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+    service.setMeal(plan.id, 2, 'dinner', recipeId, 4);
+
+    // Mark first meal as made
+    service.markMealAsMade(plan.id, 1, 'dinner', true);
+
+    // Complete the plan
+    service.completePlan(plan.id);
+
+    const madeMeals = service.getMadeMeals();
+    expect(madeMeals.length).toBe(1);
+    expect(madeMeals[0].dayOfWeek).toBe(1);
+    expect(madeMeals[0].wasMade).toBe(true);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getMadeMeals respects limit parameter', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2026-W04',
+      status: 'active',
+      notes: null,
+    });
+
+    service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+    service.setMeal(plan.id, 2, 'dinner', recipeId, 4);
+    service.setMeal(plan.id, 3, 'dinner', recipeId, 4);
+
+    service.markMealAsMade(plan.id, 1, 'dinner', true);
+    service.markMealAsMade(plan.id, 2, 'dinner', true);
+    service.markMealAsMade(plan.id, 3, 'dinner', true);
+
+    service.completePlan(plan.id);
+
+    const madeMeals = service.getMadeMeals(2);
+    expect(madeMeals.length).toBe(2);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getMadeMeals excludes meals from non-completed plans', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2026-W05',
+      status: 'active',
+      notes: null,
+    });
+
+    service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+    service.markMealAsMade(plan.id, 1, 'dinner', true);
+
+    // Don't complete the plan
+
+    const madeMeals = service.getMadeMeals();
+    expect(madeMeals.length).toBe(0);
+  } finally {
+    cleanup();
+  }
+});
+
+// =====================
+// getRecentlyMadeRecipeIds Tests
+// =====================
+
+test('getRecentlyMadeRecipeIds returns recipe IDs from made meals', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2026-W06',
+      status: 'active',
+      notes: null,
+    });
+
+    service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+    service.markMealAsMade(plan.id, 1, 'dinner', true);
+    service.completePlan(plan.id);
+
+    const recentIds = service.getRecentlyMadeRecipeIds(14);
+    expect(recentIds.length).toBe(1);
+    expect(recentIds[0]).toBe(recipeId);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getRecentlyMadeRecipeIds returns distinct recipe IDs', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2026-W07',
+      status: 'active',
+      notes: null,
+    });
+
+    // Same recipe on multiple days
+    service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+    service.setMeal(plan.id, 2, 'dinner', recipeId, 4);
+
+    service.markMealAsMade(plan.id, 1, 'dinner', true);
+    service.markMealAsMade(plan.id, 2, 'dinner', true);
+    service.completePlan(plan.id);
+
+    const recentIds = service.getRecentlyMadeRecipeIds(14);
+    expect(recentIds.length).toBe(1); // Should be distinct
+    expect(recentIds[0]).toBe(recipeId);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getRecentlyMadeRecipeIds excludes non-completed plans', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2026-W08',
+      status: 'active',
+      notes: null,
+    });
+
+    service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+    service.markMealAsMade(plan.id, 1, 'dinner', true);
+
+    // Don't complete
+
+    const recentIds = service.getRecentlyMadeRecipeIds(14);
+    expect(recentIds.length).toBe(0);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getRecentlyMadeRecipeIds uses default daysBack when not specified', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2026-W09',
+      status: 'active',
+      notes: null,
+    });
+
+    service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+    service.markMealAsMade(plan.id, 1, 'dinner', true);
+    service.completePlan(plan.id);
+
+    // Call without daysBack parameter - should use default of 14
+    const recentIds = service.getRecentlyMadeRecipeIds();
+    expect(recentIds.length).toBe(1);
+  } finally {
+    cleanup();
+  }
+});
+
+// =====================
+// setMeal with slotType tests
+// =====================
+
+test('setMeal sets slot type correctly', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const plan = service.createPlan({
+      week: '2026-W10',
+      status: 'draft',
+      notes: null,
+    });
+
+    // Set a dining_out slot
+    const meal = service.setMeal(plan.id, 1, 'dinner', null, 2, 'Restaurant dinner', 'user', 'dining_out');
+
+    expect(meal).toBeDefined();
+    expect(meal.slotType).toBe('dining_out');
+    expect(meal.notes).toBe('Restaurant dinner');
+  } finally {
+    cleanup();
+  }
+});
+
+test('setMeal validates leftoversSourceId', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2026-W11',
+      status: 'draft',
+      notes: null,
+    });
+
+    // Should throw for non-existent source
+    expect(() => service.setMeal(plan.id, 1, 'dinner', recipeId, 4, null, 'user', 'leftovers', 'non-existent-source')).toThrow();
+  } finally {
+    cleanup();
+  }
+});
+
+test('setMeal with valid leftoversSourceId works', () => {
+  const { db, service, cleanup } = setupTestDb();
+  try {
+    const recipeId = createTestRecipe(db, 'Test Recipe');
+    const plan = service.createPlan({
+      week: '2026-W12',
+      status: 'draft',
+      notes: null,
+    });
+
+    // Create a source meal
+    const sourceMeal = service.setMeal(plan.id, 1, 'dinner', recipeId, 4);
+
+    // Create leftovers meal referencing source
+    const leftoversMeal = service.setMeal(plan.id, 2, 'lunch', null, 2, 'Leftovers from dinner', 'user', 'leftovers', sourceMeal.id);
+
+    expect(leftoversMeal).toBeDefined();
+    expect(leftoversMeal.slotType).toBe('leftovers');
+    expect(leftoversMeal.leftoversSourceId).toBe(sourceMeal.id);
+  } finally {
+    cleanup();
+  }
+});
+

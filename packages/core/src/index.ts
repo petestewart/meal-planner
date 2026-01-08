@@ -18,9 +18,13 @@ export {
   IngredientSchema,
   CreateIngredientSchema,
   UpdateIngredientSchema,
+  StoreSectionEnum,
+  STORE_SECTIONS,
+  isValidStoreSection,
   type Ingredient,
   type CreateIngredient,
   type UpdateIngredient,
+  type StoreSection,
   // Tag
   TagCategoryEnum,
   TagSchema,
@@ -115,6 +119,27 @@ export {
   type PantryItemWithIngredient,
   type CreatePantryItem,
   type UpdatePantryItem,
+  // Prep batch models (T041)
+  PrepBatchSchema,
+  CreatePrepBatchSchema,
+  UpdatePrepBatchSchema,
+  PrepBatchWithRecipeSchema,
+  PrepBatchWithRemainingSchema,
+  type PrepBatch,
+  type CreatePrepBatch,
+  type UpdatePrepBatch,
+  type PrepBatchWithRecipe,
+  type PrepBatchWithRemaining,
+  // Substitution models (T046)
+  SubstitutionSchema,
+  CreateSubstitutionSchema,
+  UpdateSubstitutionSchema,
+  DIETARY_TAGS,
+  isValidDietaryTag,
+  type Substitution,
+  type CreateSubstitution,
+  type UpdateSubstitution,
+  type DietaryTag,
 } from './models/index.js';
 
 // Repositories
@@ -135,6 +160,7 @@ export {
   IngredientRepository,
   INGREDIENT_CATEGORIES,
   getAutoCategory,
+  getAutoStoreSection,
   isValidCategory,
   type IngredientCategory,
   GroceryListRepository,
@@ -151,6 +177,12 @@ export {
   type RecipeModification,
   type IngredientOverride,
   type UpsertRecipeModification,
+  // Prep batch repository (T041)
+  PrepBatchRepository,
+  type ListPrepBatchesOptions,
+  // Substitution repository (T046)
+  SubstitutionRepository,
+  type ListSubstitutionsOptions,
 } from './repos/index.js';
 
 // Re-export GroceryItemStatus type from repos
@@ -185,4 +217,20 @@ export {
   type GetSuggestionsOptions,
   SCORING_WEIGHTS,
   RECENT_DAYS_THRESHOLD,
+  // Prep batch service (T041)
+  PrepBatchService,
+  // Substitution service (T046)
+  SubstitutionService,
+  type SubstitutionSuggestion,
+  type GetSubstitutionSuggestionsOptions,
+  // RecipeService substitution-related types (T046)
+  type IngredientWithSubstitutions,
+  type RecipeSubstitutionSuggestions,
+  // Prep day service (T051)
+  PrepDayService,
+  type PrepTaskItem,
+  type PrepTask,
+  type PrepDayBatch,
+  type RecipeSummary,
+  type PrepDaySummary,
 } from './services/index.js';

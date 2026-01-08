@@ -105,6 +105,12 @@ export const PlanItemSchema = z.object({
   slotType: SlotTypeEnum.default('recipe'),
   leftoversSourceId: z.string().nullable().optional(),
   wasMade: z.boolean().default(false),
+  /** Optional reference to a prep batch this meal comes from */
+  batchId: z.string().nullable().optional(),
+  /** Whether this item is a side dish (true) or main dish (false) */
+  isSideDish: z.boolean().default(false),
+  /** Reference to the main dish this side belongs to (null if this is a main dish) */
+  mainItemId: z.string().nullable().optional(),
 });
 
 export type PlanItem = z.infer<typeof PlanItemSchema>;

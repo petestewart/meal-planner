@@ -42,6 +42,7 @@ describe('IngredientSchema', () => {
       name: 'Olive Oil',
       category: 'pantry',
       defaultUnit: 'tbsp',
+      storeSection: 'pantry',
     };
     const result = IngredientSchema.safeParse(ingredient);
     expect(result.success).toBe(true);
@@ -54,6 +55,7 @@ describe('IngredientSchema', () => {
       name: 'Salt',
       category: null,
       defaultUnit: null,
+      storeSection: null,
     };
     const result = IngredientSchema.safeParse(ingredient);
     expect(result.success).toBe(true);
@@ -89,6 +91,7 @@ describe('CreateIngredientSchema', () => {
       name: 'Garlic',
       category: 'produce',
       defaultUnit: 'clove',
+      storeSection: 'produce',
     };
     const result = CreateIngredientSchema.safeParse(createData);
     expect(result.success).toBe(true);

@@ -172,12 +172,22 @@ function displayRecipe(
   recipe: RecipeWithRelations,
   ingredientRepo: IngredientRepository,
   tagRepo: TagRepository,
-  modifications?: RecipeModification | null
+  modifications?: RecipeModification | null,
+  parentRecipe?: RecipeWithRelations | null
 ): void {
   console.log('');
   console.log(`  ${recipe.title}`);
   console.log('  ' + '='.repeat(recipe.title.length));
   console.log('');
+
+  // Display version info if this is a variant
+  if (recipe.versionName) {
+    console.log(`  Version: ${recipe.versionName}`);
+    if (parentRecipe) {
+      console.log(`  Based on: ${parentRecipe.title} (${parentRecipe.id})`);
+    }
+    console.log('');
+  }
 
   if (recipe.description) {
     console.log(`  ${recipe.description}`);
@@ -320,11 +330,51 @@ recipeCommand
   .option('--cuisine <cuisine>', 'Filter by cuisine')
   .option('-f, --favorites', 'Show only favorite recipes')
   .option('-l, --limit <n>', 'Limit results', '20')
+  .option('--versions <id>', 'Show all versions of a specific recipe')
   .action((options, command) => {
     const globalOpts = getGlobalOptions(command) as GlobalOptions;
 
     try {
       const { recipeService, tagRepo } = getServices(globalOpts.db);
+
+      // Handle --versions flag: show all versions of a specific recipe
+      if (options.versions) {
+        const versions = recipeService.getRecipeVersions(options.versions);
+
+        if (versions.length === 0) {
+          printError(`Recipe not found: ${options.versions}`);
+          process.exit(1);
+        }
+
+        if (globalOpts.json) {
+          printJson(versions);
+        } else {
+          console.log('');
+          console.log(`  Versions of: ${versions[0].title}`);
+          console.log('  ' + '='.repeat(versions[0].title.length + 13));
+          console.log('');
+
+          printTable(
+            versions.map((r) => ({
+              id: r.id,
+              title: r.title,
+              version: r.versionName || '(original)',
+              fav: r.isFavorite ? '*' : '',
+              time: formatTime(r.prepTimeMinutes, r.cookTimeMinutes),
+            })),
+            [
+              { key: 'id', header: 'ID', width: 36 },
+              { key: 'title', header: 'TITLE', width: 25 },
+              { key: 'version', header: 'VERSION', width: 20 },
+              { key: 'fav', header: 'FAV', width: 3 },
+              { key: 'time', header: 'TIME', width: 15 },
+            ]
+          );
+
+          console.log(`\nShowing ${versions.length} version(s).`);
+        }
+        return;
+      }
 
       // Resolve tag names to IDs for filtering
       let tagIds: string[] | undefined;
@@ -371,16 +421,18 @@ recipeCommand
           recipes.map((r) => ({
             id: r.id,
             title: r.title,
+            version: r.versionName || '',
             fav: r.isFavorite ? '*' : '',
             time: formatTime(r.prepTimeMinutes, r.cookTimeMinutes),
             cuisine: r.cuisine || '-',
           })),
           [
             { key: 'id', header: 'ID', width: 36 },
-            { key: 'title', header: 'TITLE', width: 30 },
+            { key: 'title', header: 'TITLE', width: 25 },
+            { key: 'version', header: 'VERSION', width: 15 },
             { key: 'fav', header: 'FAV', width: 3 },
-            { key: 'time', header: 'TIME', width: 20 },
-            { key: 'cuisine', header: 'CUISINE', width: 15 },
+            { key: 'time', header: 'TIME', width: 15 },
+            { key: 'cuisine', header: 'CUISINE', width: 12 },
           ]
         );
 
@@ -451,11 +503,14 @@ recipeCommand
       // Fetch modifications for this recipe
       const modifications = recipeService.getModifications(id);
 
+      // Fetch parent recipe info if this is a version
+      const parentRecipe = recipe.parentRecipeId ? recipeService.getParentRecipe(id) : null;
+
       if (globalOpts.json) {
-        // Include modifications in JSON output
-        printJson({ ...recipe, modifications });
+        // Include modifications and parent info in JSON output
+        printJson({ ...recipe, modifications, parentRecipe: parentRecipe ? { id: parentRecipe.id, title: parentRecipe.title } : null });
       } else {
-        displayRecipe(recipe, ingredientRepo, tagRepo, modifications);
+        displayRecipe(recipe, ingredientRepo, tagRepo, modifications, parentRecipe);
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');
@@ -970,6 +1025,42 @@ recipeCommand
       } else {
         printSuccess(`Added override for: ${recipe.title}`);
         console.log(`  ${options.ingredient} -> ${options.replace}`);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// FORK command - Create a new version/variation of a recipe
+recipeCommand
+  .command('fork <id>')
+  .description('Create a new version/variation of a recipe')
+  .requiredOption('-n, --name <name>', 'Name for this version (e.g., "sous vide", "vegan")')
+  .action((id: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const { recipeService } = getServices(globalOpts.db);
+
+      // Verify original recipe exists
+      const originalRecipe = recipeService.getRecipe(id);
+      if (!originalRecipe) {
+        printError(`Recipe not found: ${id}`);
+        process.exit(1);
+      }
+
+      const forkedRecipe = recipeService.forkRecipe(id, options.name, 'cli');
+
+      if (globalOpts.json) {
+        printJson(forkedRecipe);
+      } else {
+        printSuccess(`Created version "${options.name}" of: ${originalRecipe.title}`);
+        console.log(`  New ID: ${forkedRecipe.id}`);
+        console.log(`  Parent: ${originalRecipe.id}`);
+        console.log('');
+        console.log(`Use "meals recipe show ${forkedRecipe.id}" to view the new version.`);
+        console.log(`Use "meals recipe update ${forkedRecipe.id}" to modify it.`);
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');

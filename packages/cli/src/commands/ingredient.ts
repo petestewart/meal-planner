@@ -6,7 +6,10 @@ import {
   IngredientRepository,
   INGREDIENT_CATEGORIES,
   isValidCategory,
+  STORE_SECTIONS,
+  isValidStoreSection,
   type IngredientCategory,
+  type StoreSection,
 } from '@meals/core';
 import {
   printJson,
@@ -68,6 +71,51 @@ ingredientCommand
         printJson(updated);
       } else {
         printSuccess(`Set category for "${updated.name}" to "${category}"`);
+      }
+    } catch (error) {
+      printError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  });
+
+// SET-SECTION command
+ingredientCommand
+  .command('set-section <name> <section>')
+  .description(`Set the store section for an ingredient. Valid sections: ${STORE_SECTIONS.join(', ')}`)
+  .action((name: string, section: string, options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    try {
+      const ingredientRepo = getIngredientRepo(globalOpts.db);
+
+      // Validate section (case-insensitive)
+      const lowerSection = section.toLowerCase();
+      if (!isValidStoreSection(lowerSection)) {
+        printError(
+          `Invalid section "${section}". Valid sections are: ${STORE_SECTIONS.join(', ')}`
+        );
+        process.exit(1);
+      }
+
+      // First check if ingredient exists
+      const existing = ingredientRepo.getByName(name);
+      if (!existing) {
+        printError(`Ingredient "${name}" not found. Create it first by using it in a recipe.`);
+        process.exit(1);
+      }
+
+      // Update the store section
+      const updated = ingredientRepo.updateStoreSectionByName(name, lowerSection as StoreSection);
+
+      if (!updated) {
+        printError(`Failed to update store section for ingredient "${name}"`);
+        process.exit(1);
+      }
+
+      if (globalOpts.json) {
+        printJson(updated);
+      } else {
+        printSuccess(`Set store section for "${updated.name}" to "${lowerSection}"`);
       }
     } catch (error) {
       printError(error instanceof Error ? error.message : 'Unknown error');
@@ -154,6 +202,26 @@ ingredientCommand
       console.log('='.repeat(30));
       for (const cat of INGREDIENT_CATEGORIES) {
         console.log(`  - ${cat}`);
+      }
+      console.log('');
+    }
+  });
+
+// SECTIONS command
+ingredientCommand
+  .command('sections')
+  .description('List valid store sections')
+  .action((options, command) => {
+    const globalOpts = getGlobalOptions(command) as GlobalOptions;
+
+    if (globalOpts.json) {
+      printJson(STORE_SECTIONS);
+    } else {
+      console.log('');
+      console.log('Valid store sections:');
+      console.log('='.repeat(30));
+      for (const section of STORE_SECTIONS) {
+        console.log(`  - ${section}`);
       }
       console.log('');
     }

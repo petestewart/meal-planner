@@ -7,7 +7,8 @@
 
 import type { Database } from 'better-sqlite3';
 import { v4 as uuid } from 'uuid';
-import type { Ingredient, CreateIngredient } from '../models/ingredient.js';
+import type { Ingredient, CreateIngredient, StoreSection } from '../models/ingredient.js';
+import { isValidStoreSection, STORE_SECTIONS } from '../models/ingredient.js';
 
 /**
  * Valid ingredient categories for grouping in grocery lists
@@ -278,12 +279,102 @@ export function isValidCategory(category: string): category is IngredientCategor
   return INGREDIENT_CATEGORIES.includes(category as IngredientCategory);
 }
 
+/**
+ * Store section keyword patterns for auto-assignment.
+ * Maps keywords to store sections for matching ingredient names.
+ */
+const STORE_SECTION_KEYWORDS: Record<StoreSection, string[]> = {
+  produce: [
+    'lettuce', 'tomato', 'onion', 'garlic', 'carrot', 'celery', 'pepper', 'spinach',
+    'kale', 'broccoli', 'potato', 'fruit', 'apple', 'banana', 'lemon', 'lime',
+    'avocado', 'cucumber', 'mushroom', 'zucchini', 'cabbage', 'corn', 'peas',
+    'green bean', 'asparagus', 'cauliflower', 'eggplant', 'squash', 'cilantro',
+    'parsley', 'basil', 'mint', 'ginger', 'shallot', 'scallion', 'leek',
+    'orange', 'grape', 'strawberr', 'blueberr', 'raspberr', 'melon', 'mango',
+    'pineapple', 'peach', 'pear', 'plum', 'cherry', 'radish', 'beet', 'turnip',
+  ],
+  meat: [
+    'chicken', 'beef', 'pork', 'lamb', 'turkey', 'bacon', 'sausage', 'ham',
+    'ground', 'steak', 'chop', 'roast', 'rib', 'wing', 'thigh', 'breast',
+    'drumstick', 'tenderloin', 'brisket', 'meatball', 'veal', 'duck',
+  ],
+  seafood: [
+    'salmon', 'tuna', 'shrimp', 'fish', 'cod', 'tilapia', 'crab', 'lobster',
+    'scallop', 'halibut', 'trout', 'bass', 'mahi', 'swordfish', 'anchov',
+    'sardine', 'clam', 'mussel', 'oyster', 'calamari', 'squid', 'octopus',
+  ],
+  dairy: [
+    'milk', 'cheese', 'butter', 'cream', 'yogurt', 'egg', 'sour cream',
+    'cottage', 'ricotta', 'mozzarella', 'cheddar', 'parmesan', 'feta',
+    'gouda', 'brie', 'swiss', 'provolone', 'half and half', 'whipping',
+    'greek yogurt', 'kefir', 'buttermilk',
+  ],
+  bakery: [
+    'bread', 'roll', 'tortilla', 'baguette', 'croissant', 'bagel', 'muffin',
+    'pita', 'naan', 'focaccia', 'ciabatta', 'sourdough', 'brioche', 'bun',
+  ],
+  frozen: [
+    'frozen', 'ice cream', 'sorbet', 'gelato', 'popsicle', 'pizza frozen',
+  ],
+  pantry: [
+    'rice', 'pasta', 'flour', 'sugar', 'oil', 'bean', 'canned', 'broth',
+    'stock', 'lentil', 'quinoa', 'oat', 'cereal', 'nut', 'seed', 'honey',
+    'maple syrup', 'peanut butter', 'almond butter', 'jam', 'jelly',
+    'chocolate', 'cocoa', 'baking powder', 'baking soda', 'cornstarch',
+    'yeast', 'vanilla', 'extract', 'chickpea', 'couscous', 'barley',
+    'breadcrumb', 'panko', 'cracker', 'chip', 'tortilla chip', 'popcorn',
+    'noodle', 'spaghetti', 'penne', 'macaroni', 'lasagna', 'ravioli',
+    'tomato paste', 'tomato sauce', 'crushed tomato', 'diced tomato',
+  ],
+  beverages: [
+    'juice', 'soda', 'water', 'wine', 'beer', 'coffee', 'tea',
+    'lemonade', 'sparkling', 'tonic', 'cola', 'ginger ale', 'energy drink',
+  ],
+  condiments: [
+    'ketchup', 'mustard', 'mayonnaise', 'mayo', 'sauce', 'dressing', 'vinegar',
+    'salsa', 'hot sauce', 'bbq', 'teriyaki', 'soy sauce', 'fish sauce',
+    'hoisin', 'worcestershire', 'sriracha', 'relish', 'pickle',
+  ],
+  spices: [
+    'salt', 'pepper', 'cumin', 'paprika', 'oregano', 'basil', 'thyme',
+    'cinnamon', 'spice', 'seasoning', 'curry', 'chili powder', 'cayenne',
+    'turmeric', 'nutmeg', 'clove', 'allspice', 'cardamom', 'coriander',
+    'rosemary', 'sage', 'dill', 'bay leaf', 'garlic powder', 'onion powder',
+    'ginger powder', 'italian seasoning', 'cajun', 'taco seasoning',
+  ],
+  other: [],
+};
+
+/**
+ * Get the auto-store-section for an ingredient name.
+ * Uses keyword matching to determine the appropriate store section.
+ * Returns null if no match is found.
+ */
+export function getAutoStoreSection(name: string): StoreSection | null {
+  const lowerName = name.toLowerCase().trim();
+
+  // Check each section's keywords
+  for (const section of STORE_SECTIONS) {
+    if (section === 'other') continue; // Skip 'other' as it's the default
+
+    const keywords = STORE_SECTION_KEYWORDS[section];
+    for (const keyword of keywords) {
+      if (lowerName.includes(keyword)) {
+        return section;
+      }
+    }
+  }
+
+  return null;
+}
+
 /** Raw ingredient row from database */
 interface IngredientRow {
   id: string;
   name: string;
   category: string | null;
   default_unit: string | null;
+  store_section: string | null;
 }
 
 /**
@@ -295,6 +386,7 @@ function rowToIngredient(row: IngredientRow): Ingredient {
     name: row.name,
     category: row.category,
     defaultUnit: row.default_unit,
+    storeSection: row.store_section as StoreSection | null,
   };
 }
 
@@ -309,9 +401,9 @@ export class IngredientRepository {
 
     this.db
       .prepare(
-        `INSERT INTO ingredients (id, name, category, default_unit) VALUES (?, ?, ?, ?)`
+        `INSERT INTO ingredients (id, name, category, default_unit, store_section) VALUES (?, ?, ?, ?, ?)`
       )
-      .run(id, data.name, data.category ?? null, data.defaultUnit ?? null);
+      .run(id, data.name, data.category ?? null, data.defaultUnit ?? null, data.storeSection ?? null);
 
     return this.getById(id)!;
   }
@@ -343,8 +435,9 @@ export class IngredientRepository {
    * If an ingredient with the given name exists, returns it.
    * Otherwise, creates a new ingredient with the given name.
    * Auto-categorizes common ingredients if no category is provided.
+   * Auto-assigns store section based on ingredient name keywords.
    */
-  getOrCreate(name: string, category?: string | null, defaultUnit?: string | null): Ingredient {
+  getOrCreate(name: string, category?: string | null, defaultUnit?: string | null, storeSection?: StoreSection | null): Ingredient {
     const existing = this.getByName(name);
     if (existing) {
       return existing;
@@ -353,10 +446,14 @@ export class IngredientRepository {
     // Auto-categorize common ingredients if no category specified
     const resolvedCategory = category ?? getAutoCategory(name) ?? null;
 
+    // Auto-assign store section based on ingredient name keywords
+    const resolvedStoreSection = storeSection ?? getAutoStoreSection(name) ?? 'other';
+
     return this.create({
       name,
       category: resolvedCategory,
       defaultUnit: defaultUnit ?? null,
+      storeSection: resolvedStoreSection,
     });
   }
 
@@ -431,5 +528,66 @@ export class IngredientRepository {
     }
 
     return this.updateCategory(existing.id, category);
+  }
+
+  /**
+   * Update an ingredient's store section
+   */
+  updateStoreSection(id: string, storeSection: StoreSection | null): Ingredient | null {
+    const result = this.db
+      .prepare('UPDATE ingredients SET store_section = ? WHERE id = ?')
+      .run(storeSection, id);
+
+    if (result.changes === 0) {
+      return null;
+    }
+
+    return this.getById(id);
+  }
+
+  /**
+   * Update an ingredient's store section by name (case-insensitive)
+   */
+  updateStoreSectionByName(name: string, storeSection: StoreSection | null): Ingredient | null {
+    const existing = this.getByName(name);
+    if (!existing) {
+      return null;
+    }
+
+    return this.updateStoreSection(existing.id, storeSection);
+  }
+
+  /**
+   * Update an ingredient with arbitrary fields.
+   * Used by PATCH endpoint.
+   */
+  update(id: string, data: { category?: string | null; storeSection?: StoreSection | null }): Ingredient | null {
+    const updates: string[] = [];
+    const params: (string | null)[] = [];
+
+    if (data.category !== undefined) {
+      updates.push('category = ?');
+      params.push(data.category);
+    }
+
+    if (data.storeSection !== undefined) {
+      updates.push('store_section = ?');
+      params.push(data.storeSection);
+    }
+
+    if (updates.length === 0) {
+      return this.getById(id);
+    }
+
+    params.push(id);
+    const result = this.db
+      .prepare(`UPDATE ingredients SET ${updates.join(', ')} WHERE id = ?`)
+      .run(...params);
+
+    if (result.changes === 0) {
+      return null;
+    }
+
+    return this.getById(id);
   }
 }

@@ -62,6 +62,7 @@ interface IngredientAggregation {
   ingredient: string;
   ingredientId: string;
   category: string | null;
+  storeSection: string | null;
   /** Map of unit -> quantity */
   quantitiesByUnit: Map<string, number>;
   /** Recipe titles that need this ingredient */
@@ -76,6 +77,7 @@ interface IngredientRow {
   name: string;
   category: string | null;
   default_unit: string | null;
+  store_section: string | null;
 }
 
 /**
@@ -210,6 +212,8 @@ export interface GroceryListItemWithStatus {
   ingredientId: string | null;
   /** Category of the ingredient (looked up from ingredients table) */
   category: string | null;
+  /** Store section for grocery organization */
+  storeSection: string | null;
 }
 
 /**
@@ -290,6 +294,10 @@ export class GroceryService {
     // Only include items with slot_type 'recipe' (skip dining_out, skip, leftovers)
     const aggregations = new Map<string, IngredientAggregation>();
 
+    // Track batches we've already processed to avoid double-counting
+    // Key: batchId, Value: { recipeId, totalServings, recipeTitle }
+    const processedBatches = new Map<string, { recipeId: string; totalServings: number; recipeTitle: string }>();
+
     for (const item of plan.items || []) {
       // Only process recipe slots - skip dining_out, skip, and leftovers
       if (item.slotType && item.slotType !== 'recipe') continue;
@@ -298,6 +306,45 @@ export class GroceryService {
       const recipe = this.recipeRepo.getById(item.recipeId);
       if (!recipe || !recipe.ingredients) continue;
 
+      // Check if this item is part of a batch
+      if (item.batchId) {
+        // If we've already processed this batch, skip it
+        if (processedBatches.has(item.batchId)) {
+          continue;
+        }
+
+        // Get batch info to determine total servings
+        const batchRow = this.db
+          .prepare('SELECT total_servings FROM prep_batches WHERE id = ?')
+          .get(item.batchId) as { total_servings: number } | undefined;
+
+        if (batchRow) {
+          // Use batch total servings instead of individual meal servings
+          const scaleFactor = batchRow.total_servings / recipe.servings;
+
+          for (const recipeIngredient of recipe.ingredients) {
+            this.aggregateIngredient(
+              aggregations,
+              recipeIngredient.ingredientId,
+              recipeIngredient.quantity,
+              recipeIngredient.unit,
+              scaleFactor,
+              `${recipe.title} (batch)`
+            );
+          }
+
+          // Mark this batch as processed
+          processedBatches.set(item.batchId, {
+            recipeId: item.recipeId,
+            totalServings: batchRow.total_servings,
+            recipeTitle: recipe.title,
+          });
+          continue;
+        }
+        // If batch not found, fall through to normal processing
+      }
+
+      // Normal processing for non-batch items
       // Calculate scaling factor (plan servings / recipe servings)
       const scaleFactor = item.servings / recipe.servings;
 
@@ -379,6 +426,7 @@ export class GroceryService {
 
     const ingredientName = ingredientRow?.name ?? ingredientId;
     const category = ingredientRow?.category ?? null;
+    const storeSection = ingredientRow?.store_section ?? null;
 
     // Get or create aggregation
     let agg = aggregations.get(ingredientId);
@@ -387,6 +435,7 @@ export class GroceryService {
         ingredient: ingredientName,
         ingredientId,
         category,
+        storeSection,
         quantitiesByUnit: new Map(),
         recipes: new Set(),
       };
@@ -430,16 +479,21 @@ export class GroceryService {
 
   /**
    * Build grouped grocery list from aggregations.
+   * Groups by store_section for organized shopping.
    */
   private buildGroups(aggregations: Map<string, IngredientAggregation>): GroceryGroup[] {
-    // Group by category
-    const categoryMap = new Map<string, GroceryItem[]>();
+    // Group by store section (with capitalized display names)
+    const sectionMap = new Map<string, GroceryItem[]>();
 
     for (const agg of aggregations.values()) {
-      const categoryName = agg.category || 'Uncategorized';
+      // Use store_section if available, fallback to 'Other'
+      // Capitalize for display (e.g., 'produce' -> 'Produce')
+      const sectionName = agg.storeSection
+        ? agg.storeSection.charAt(0).toUpperCase() + agg.storeSection.slice(1)
+        : 'Other';
 
-      if (!categoryMap.has(categoryName)) {
-        categoryMap.set(categoryName, []);
+      if (!sectionMap.has(sectionName)) {
+        sectionMap.set(sectionName, []);
       }
 
       // Convert each unit quantity to a grocery item
@@ -449,7 +503,7 @@ export class GroceryService {
           ? toDisplayUnit(quantity, unit)
           : { quantity: Math.round(quantity * 100) / 100, unit };
 
-        categoryMap.get(categoryName)!.push({
+        sectionMap.get(sectionName)!.push({
           ingredient: agg.ingredient,
           totalQuantity: display.quantity,
           unit: display.unit,
@@ -459,7 +513,7 @@ export class GroceryService {
 
       // If no quantities were recorded, still add the ingredient with 0 quantity
       if (agg.quantitiesByUnit.size === 0) {
-        categoryMap.get(categoryName)!.push({
+        sectionMap.get(sectionName)!.push({
           ingredient: agg.ingredient,
           totalQuantity: 0,
           unit: '',
@@ -468,18 +522,18 @@ export class GroceryService {
       }
     }
 
-    // Sort categories and items
+    // Sort sections and items
     const groups: GroceryGroup[] = [];
 
-    // Get sorted category names (Uncategorized last)
-    const categoryNames = Array.from(categoryMap.keys()).sort((a, b) => {
-      if (a === 'Uncategorized') return 1;
-      if (b === 'Uncategorized') return -1;
+    // Get sorted section names (Other last)
+    const sectionNames = Array.from(sectionMap.keys()).sort((a, b) => {
+      if (a === 'Other') return 1;
+      if (b === 'Other') return -1;
       return a.localeCompare(b);
     });
 
-    for (const name of categoryNames) {
-      const items = categoryMap.get(name)!;
+    for (const name of sectionNames) {
+      const items = sectionMap.get(name)!;
       // Sort items by ingredient name
       items.sort((a, b) => a.ingredient.localeCompare(b.ingredient));
 
@@ -607,13 +661,15 @@ export class GroceryService {
       generatedAt: list.generatedAt,
       updatedAt: list.updatedAt,
       items: list.items.map((item) => {
-        // Look up category from ingredients table if we have an ingredient ID
+        // Look up category and store_section from ingredients table if we have an ingredient ID
         let category: string | null = null;
+        let storeSection: string | null = null;
         if (item.ingredientId) {
           const ingredientRow = this.db
-            .prepare('SELECT category FROM ingredients WHERE id = ?')
-            .get(item.ingredientId) as { category: string | null } | undefined;
+            .prepare('SELECT category, store_section FROM ingredients WHERE id = ?')
+            .get(item.ingredientId) as { category: string | null; store_section: string | null } | undefined;
           category = ingredientRow?.category ?? null;
+          storeSection = ingredientRow?.store_section ?? null;
         }
 
         return {
@@ -627,6 +683,7 @@ export class GroceryService {
           recipes: item.recipes,
           ingredientId: item.ingredientId,
           category,
+          storeSection,
         };
       }),
       counts,
@@ -678,13 +735,15 @@ export class GroceryService {
    * Convert internal item to public format
    */
   private convertItemToPublic(item: PersistedGroceryItem): GroceryListItemWithStatus {
-    // Look up category from ingredients table if we have an ingredient ID
+    // Look up category and store_section from ingredients table if we have an ingredient ID
     let category: string | null = null;
+    let storeSection: string | null = null;
     if (item.ingredientId) {
       const ingredientRow = this.db
-        .prepare('SELECT category FROM ingredients WHERE id = ?')
-        .get(item.ingredientId) as { category: string | null } | undefined;
+        .prepare('SELECT category, store_section FROM ingredients WHERE id = ?')
+        .get(item.ingredientId) as { category: string | null; store_section: string | null } | undefined;
       category = ingredientRow?.category ?? null;
+      storeSection = ingredientRow?.store_section ?? null;
     }
 
     return {
@@ -698,6 +757,7 @@ export class GroceryService {
       recipes: item.recipes,
       ingredientId: item.ingredientId,
       category,
+      storeSection,
     };
   }
 

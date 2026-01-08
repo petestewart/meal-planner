@@ -63,11 +63,11 @@ function setupTestDb(): TestContext {
 }
 
 // Helper to create a test ingredient
-function createIngredient(db: Database, id: string, name: string, category: string | null = null, defaultUnit: string | null = null): string {
+function createIngredient(db: Database, id: string, name: string, category: string | null = null, defaultUnit: string | null = null, storeSection: string | null = null): string {
   db.prepare(
-    `INSERT INTO ingredients (id, name, category, default_unit)
-     VALUES (?, ?, ?, ?)`
-  ).run(id, name, category, defaultUnit);
+    `INSERT INTO ingredients (id, name, category, default_unit, store_section)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(id, name, category, defaultUnit, storeSection);
   return id;
 }
 
@@ -138,8 +138,8 @@ test('generateList returns empty groups for plan with no items', () => {
 test('generateList works with plan ID', () => {
   const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
   try {
-    // Create ingredient
-    const ingId = createIngredient(db, 'ing-1', 'Onion', 'Produce');
+    // Create ingredient with store_section
+    const ingId = createIngredient(db, 'ing-1', 'Onion', 'Produce', null, 'produce');
 
     // Create recipe with ingredient
     const recipeId = createRecipe(db, recipeRepo, 'Simple Dish', 4, [
@@ -316,7 +316,8 @@ test('converts compatible units', () => {
 test('keeps incompatible units separate', () => {
   const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
   try {
-    const eggId = createIngredient(db, 'ing-eggs', 'Eggs', 'Dairy');
+    // Create ingredient with store_section
+    const eggId = createIngredient(db, 'ing-eggs', 'Eggs', 'Dairy', null, 'dairy');
 
     // Two recipes with incompatible units
     const recipe1 = createRecipe(db, recipeRepo, 'Recipe with pieces', 4, [
@@ -347,15 +348,16 @@ test('keeps incompatible units separate', () => {
 });
 
 // =====================
-// Category Grouping Tests
+// Store Section Grouping Tests
 // =====================
 
-test('groups ingredients by category', () => {
+test('groups ingredients by store section', () => {
   const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
   try {
-    const chickenId = createIngredient(db, 'ing-chicken', 'Chicken', 'Meat');
-    const onionId = createIngredient(db, 'ing-onion', 'Onion', 'Produce');
-    const milkId = createIngredient(db, 'ing-milk', 'Milk', 'Dairy');
+    // Create ingredients with store_section (5th parameter)
+    const chickenId = createIngredient(db, 'ing-chicken', 'Chicken', 'Meat', null, 'meat');
+    const onionId = createIngredient(db, 'ing-onion', 'Onion', 'Produce', null, 'produce');
+    const milkId = createIngredient(db, 'ing-milk', 'Milk', 'Dairy', null, 'dairy');
 
     const recipeId = createRecipe(db, recipeRepo, 'Mixed Dish', 4, [
       { ingredientId: chickenId, quantity: 500, unit: 'g' },
@@ -369,10 +371,10 @@ test('groups ingredients by category', () => {
     const result = groceryService.generateList('2025-W09');
     expect(result).toBeDefined();
 
-    // Should have 3 categories
-    assertArrayLength(result.groups, 3, 'should have 3 category groups');
+    // Should have 3 store sections
+    assertArrayLength(result.groups, 3, 'should have 3 store section groups');
 
-    // Find each category
+    // Find each store section (capitalized)
     const dairyGroup = result.groups.find((g) => g.name === 'Dairy');
     const meatGroup = result.groups.find((g) => g.name === 'Meat');
     const produceGroup = result.groups.find((g) => g.name === 'Produce');
@@ -389,10 +391,11 @@ test('groups ingredients by category', () => {
   }
 });
 
-test('puts uncategorized ingredients in Uncategorized group', () => {
+test('puts ingredients without store_section in Other group', () => {
   const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
   try {
-    const ingId = createIngredient(db, 'ing-misc', 'Mystery Item', null);
+    // Create ingredient with no store_section
+    const ingId = createIngredient(db, 'ing-misc', 'Mystery Item', null, null, null);
 
     const recipeId = createRecipe(db, recipeRepo, 'Mystery Dish', 4, [
       { ingredientId: ingId, quantity: 1, unit: 'unit' },
@@ -405,18 +408,19 @@ test('puts uncategorized ingredients in Uncategorized group', () => {
     expect(result).toBeDefined();
 
     assertArrayLength(result.groups, 1, 'should have 1 group');
-    expect(result.groups[0].name).toBe('Uncategorized');
+    expect(result.groups[0].name).toBe('Other');
   } finally {
     cleanup();
   }
 });
 
-test('sorts categories alphabetically with Uncategorized last', () => {
+test('sorts store sections alphabetically with Other last', () => {
   const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
   try {
-    const ingA = createIngredient(db, 'ing-a', 'Item A', 'Zebra');
-    const ingB = createIngredient(db, 'ing-b', 'Item B', 'Apple');
-    const ingC = createIngredient(db, 'ing-c', 'Item C', null); // Uncategorized
+    // Use store_section for grouping (not category)
+    const ingA = createIngredient(db, 'ing-a', 'Item A', null, null, 'spices');
+    const ingB = createIngredient(db, 'ing-b', 'Item B', null, null, 'dairy');
+    const ingC = createIngredient(db, 'ing-c', 'Item C', null, null, null); // Other
 
     const recipeId = createRecipe(db, recipeRepo, 'Multi Dish', 4, [
       { ingredientId: ingA, quantity: 1, unit: 'unit' },
@@ -431,10 +435,10 @@ test('sorts categories alphabetically with Uncategorized last', () => {
     expect(result).toBeDefined();
 
     assertArrayLength(result.groups, 3, 'should have 3 groups');
-    // Should be sorted: Apple, Zebra, Uncategorized
-    expect(result.groups[0].name).toBe('Apple');
-    expect(result.groups[1].name).toBe('Zebra');
-    expect(result.groups[2].name).toBe('Uncategorized');
+    // Should be sorted: Dairy, Spices, Other (alphabetical, Other last)
+    expect(result.groups[0].name).toBe('Dairy');
+    expect(result.groups[1].name).toBe('Spices');
+    expect(result.groups[2].name).toBe('Other');
   } finally {
     cleanup();
   }
@@ -690,6 +694,650 @@ test('converts tablespoons and teaspoons correctly', () => {
     // 2 tbsp = 30ml, 6 tsp = 30ml, total = 60ml = 4 tbsp
     assertApproxEqual(sugarItem.totalQuantity, 4, 0.1, 'should be ~4 tbsp');
     expect(sugarItem.unit).toBe('tbsp');
+  } finally {
+    cleanup();
+  }
+});
+
+// =====================
+// Persistent Grocery List Tests
+// =====================
+
+test('generateAndPersist creates persistent list for week', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W40', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    const result = groceryService.generateAndPersist('2025-W40');
+    expect(result).toBeDefined();
+    expect(result.week).toBe('2025-W40');
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(result.generatedAt).toBeDefined();
+    expect(result.counts.needToBuy).toBeGreaterThan(0);
+  } finally {
+    cleanup();
+  }
+});
+
+test('generateAndPersist returns null for non-existent week', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const result = groceryService.generateAndPersist('2099-W52');
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('generateAndPersist preserves manual items when regenerating', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W41', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    // Generate initial list
+    groceryService.generateAndPersist('2025-W41');
+
+    // Add a manual item
+    groceryService.addManualItem('2025-W41', 'Manual Item', 1, 'unit');
+
+    // Regenerate list
+    const result = groceryService.generateAndPersist('2025-W41');
+    expect(result).toBeDefined();
+
+    // Manual item should be preserved
+    const manualItem = result.items.find((i) => i.name === 'Manual Item');
+    expect(manualItem).toBeDefined();
+    expect(manualItem.isManual).toBe(true);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getPersistentList returns null for non-existent week', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const result = groceryService.getPersistentList('2099-W52');
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getPersistentList returns existing list', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W42', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    groceryService.generateAndPersist('2025-W42');
+
+    const result = groceryService.getPersistentList('2025-W42');
+    expect(result).toBeDefined();
+    expect(result.week).toBe('2025-W42');
+  } finally {
+    cleanup();
+  }
+});
+
+test('addManualItem adds new item to list', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W43', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    groceryService.generateAndPersist('2025-W43');
+
+    const item = groceryService.addManualItem('2025-W43', 'Paper Towels', 2, 'rolls');
+    expect(item).toBeDefined();
+    expect(item.name).toBe('Paper Towels');
+    expect(item.quantity).toBe(2);
+    expect(item.unit).toBe('rolls');
+    expect(item.isManual).toBe(true);
+    expect(item.status).toBe('need_to_buy');
+  } finally {
+    cleanup();
+  }
+});
+
+test('addManualItem updates quantity for existing item', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W44', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    groceryService.generateAndPersist('2025-W44');
+
+    groceryService.addManualItem('2025-W44', 'Extra Item', 2, 'units');
+    const updated = groceryService.addManualItem('2025-W44', 'Extra Item', 3, 'units');
+
+    expect(updated).toBeDefined();
+    expect(updated.name).toBe('Extra Item');
+    expect(updated.quantity).toBe(5); // 2 + 3
+  } finally {
+    cleanup();
+  }
+});
+
+test('addManualItem creates list if none exists', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const item = groceryService.addManualItem('2025-W45', 'New Manual Item', 1, 'unit');
+    expect(item).toBeDefined();
+    expect(item.name).toBe('New Manual Item');
+    expect(item.isManual).toBe(true);
+
+    // List should now exist
+    const list = groceryService.getPersistentList('2025-W45');
+    expect(list).toBeDefined();
+    expect(list.items.length).toBe(1);
+  } finally {
+    cleanup();
+  }
+});
+
+test('checkItem marks item as already_have', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W46', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    groceryService.generateAndPersist('2025-W46');
+
+    const item = groceryService.checkItem('2025-W46', 'Test Ingredient');
+    expect(item).toBeDefined();
+    expect(item.status).toBe('already_have');
+  } finally {
+    cleanup();
+  }
+});
+
+test('checkItem returns null for non-existent week', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const result = groceryService.checkItem('2099-W52', 'Some Item');
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('checkItem returns null for non-existent item', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W47', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    groceryService.generateAndPersist('2025-W47');
+
+    const result = groceryService.checkItem('2025-W47', 'Non-existent Item');
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('checkItem works with item ID', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W48', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    const list = groceryService.generateAndPersist('2025-W48');
+    const itemId = list.items[0].id;
+
+    const item = groceryService.checkItem('2025-W48', itemId);
+    expect(item).toBeDefined();
+    expect(item.status).toBe('already_have');
+  } finally {
+    cleanup();
+  }
+});
+
+test('checkItemPartial marks item as partial with quantity', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 10, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W49', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    groceryService.generateAndPersist('2025-W49');
+
+    const item = groceryService.checkItemPartial('2025-W49', 'Test Ingredient', 5);
+    expect(item).toBeDefined();
+    expect(item.status).toBe('partial');
+    expect(item.haveQuantity).toBe(5);
+  } finally {
+    cleanup();
+  }
+});
+
+test('checkItemPartial returns null for non-existent week', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const result = groceryService.checkItemPartial('2099-W52', 'Some Item', 5);
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('checkItemPartial returns null for non-existent item', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W50', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    groceryService.generateAndPersist('2025-W50');
+
+    const result = groceryService.checkItemPartial('2025-W50', 'Non-existent Item', 5);
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('uncheckItem resets item to need_to_buy', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W51', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    groceryService.generateAndPersist('2025-W51');
+
+    // First check the item
+    groceryService.checkItem('2025-W51', 'Test Ingredient');
+
+    // Then uncheck it
+    const item = groceryService.uncheckItem('2025-W51', 'Test Ingredient');
+    expect(item).toBeDefined();
+    expect(item.status).toBe('need_to_buy');
+  } finally {
+    cleanup();
+  }
+});
+
+test('uncheckItem returns null for non-existent week', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const result = groceryService.uncheckItem('2099-W52', 'Some Item');
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('uncheckItem returns null for non-existent item', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2025-W52', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    groceryService.generateAndPersist('2025-W52');
+
+    const result = groceryService.uncheckItem('2025-W52', 'Non-existent Item');
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('checkPantry marks items based on pantry inventory', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-pantry', 'Pantry Ingredient', 'Pantry');
+    const recipeId = createRecipe(db, recipeRepo, 'Pantry Recipe', 4, [
+      { ingredientId: ingId, quantity: 10, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2026-W01', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    // Add to pantry
+    db.prepare(
+      `INSERT INTO pantry_items (id, ingredient_id, quantity, unit, location, expires_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+    ).run('pantry-1', ingId, 15, 'cups', 'pantry', null);
+
+    groceryService.generateAndPersist('2026-W01');
+
+    const result = groceryService.checkPantry('2026-W01');
+    expect(result).toBeDefined();
+    expect(result.week).toBe('2026-W01');
+    expect(result.itemsChecked).toBeGreaterThan(0);
+    expect(result.itemsMarked).toBeGreaterThan(0);
+  } finally {
+    cleanup();
+  }
+});
+
+test('checkPantry returns warning for non-existent week', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const result = groceryService.checkPantry('2099-W52');
+    expect(result.itemsChecked).toBe(0);
+    expect(result.itemsMarked).toBe(0);
+    expect(result.warning).toBeDefined();
+  } finally {
+    cleanup();
+  }
+});
+
+test('checkPantry marks partial when pantry has some quantity', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-partial', 'Partial Ingredient', 'Pantry');
+    const recipeId = createRecipe(db, recipeRepo, 'Partial Recipe', 4, [
+      { ingredientId: ingId, quantity: 10, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2026-W02', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    // Add partial quantity to pantry
+    db.prepare(
+      `INSERT INTO pantry_items (id, ingredient_id, quantity, unit, location, expires_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+    ).run('pantry-2', ingId, 5, 'cups', 'pantry', null);
+
+    groceryService.generateAndPersist('2026-W02');
+
+    const result = groceryService.checkPantry('2026-W02');
+    expect(result.itemsMarked).toBeGreaterThan(0);
+
+    const list = groceryService.getPersistentList('2026-W02');
+    const partialItem = list.items.find((i) => i.name === 'Partial Ingredient');
+    expect(partialItem.status).toBe('partial');
+    expect(partialItem.haveQuantity).toBe(5);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getItemById returns item', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2026-W03', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    const list = groceryService.generateAndPersist('2026-W03');
+    const itemId = list.items[0].id;
+
+    const item = groceryService.getItemById(itemId);
+    expect(item).toBeDefined();
+    expect(item.id).toBe(itemId);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getItemById returns null for non-existent item', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const result = groceryService.getItemById('non-existent-id');
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('updateItem updates item properties', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2026-W04', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    const list = groceryService.generateAndPersist('2026-W04');
+    const itemId = list.items[0].id;
+
+    const updated = groceryService.updateItem(itemId, { quantity: 5, status: 'partial', haveQuantity: 2 });
+    expect(updated).toBeDefined();
+    expect(updated.quantity).toBe(5);
+    expect(updated.status).toBe('partial');
+    expect(updated.haveQuantity).toBe(2);
+  } finally {
+    cleanup();
+  }
+});
+
+test('updateItem returns null for non-existent item', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const result = groceryService.updateItem('non-existent-id', { quantity: 5 });
+    expect(result).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('deleteItem removes item', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-test', 'Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2026-W05', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    const list = groceryService.generateAndPersist('2026-W05');
+    const itemId = list.items[0].id;
+
+    const deleted = groceryService.deleteItem(itemId);
+    expect(deleted).toBe(true);
+
+    const item = groceryService.getItemById(itemId);
+    expect(item).toBe(null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('deleteItem returns false for non-existent item', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const result = groceryService.deleteItem('non-existent-id');
+    expect(result).toBe(false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('getItemsByStatus returns items with matching status', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ing1 = createIngredient(db, 'ing-1', 'Ingredient 1', 'Produce');
+    const ing2 = createIngredient(db, 'ing-2', 'Ingredient 2', 'Dairy');
+    const recipeId = createRecipe(db, recipeRepo, 'Test Recipe', 4, [
+      { ingredientId: ing1, quantity: 2, unit: 'cups' },
+      { ingredientId: ing2, quantity: 3, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2026-W06', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    groceryService.generateAndPersist('2026-W06');
+
+    // Check one item
+    groceryService.checkItem('2026-W06', 'Ingredient 1');
+
+    const needToBuy = groceryService.getItemsByStatus('2026-W06', 'need_to_buy');
+    const alreadyHave = groceryService.getItemsByStatus('2026-W06', 'already_have');
+
+    expect(needToBuy.length).toBe(1);
+    expect(alreadyHave.length).toBe(1);
+    expect(alreadyHave[0].name).toBe('Ingredient 1');
+  } finally {
+    cleanup();
+  }
+});
+
+test('getItemsByStatus returns empty array for non-existent week', () => {
+  const { groceryService, cleanup } = setupTestDb();
+  try {
+    const result = groceryService.getItemsByStatus('2099-W52', 'need_to_buy');
+    expect(result.length).toBe(0);
+  } finally {
+    cleanup();
+  }
+});
+
+test('generateList with excludePantry option subtracts pantry quantities', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-pantry-exclude', 'Pantry Exclude Item', 'Pantry');
+    const recipeId = createRecipe(db, recipeRepo, 'Pantry Exclude Recipe', 4, [
+      { ingredientId: ingId, quantity: 10, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2026-W07', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    // Add some to pantry
+    db.prepare(
+      `INSERT INTO pantry_items (id, ingredient_id, quantity, unit, location, expires_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+    ).run('pantry-3', ingId, 3, 'cups', 'pantry', null);
+
+    const listWithoutExclude = groceryService.generateList('2026-W07');
+    const listWithExclude = groceryService.generateList('2026-W07', { excludePantry: true });
+
+    expect(listWithoutExclude).toBeDefined();
+    expect(listWithExclude).toBeDefined();
+
+    const itemWithout = listWithoutExclude.groups[0]?.items.find((i) => i.ingredient === 'Pantry Exclude Item');
+    const itemWith = listWithExclude.groups[0]?.items.find((i) => i.ingredient === 'Pantry Exclude Item');
+
+    expect(itemWithout.totalQuantity).toBe(10);
+    expect(itemWith.totalQuantity).toBe(7); // 10 - 3
+  } finally {
+    cleanup();
+  }
+});
+
+test('generateList with excludePantry removes item when pantry has enough', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-pantry-full', 'Pantry Full Item', 'Pantry');
+    const recipeId = createRecipe(db, recipeRepo, 'Pantry Full Recipe', 4, [
+      { ingredientId: ingId, quantity: 5, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2026-W08', status: 'draft', notes: null });
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    // Add enough to pantry
+    db.prepare(
+      `INSERT INTO pantry_items (id, ingredient_id, quantity, unit, location, expires_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+    ).run('pantry-4', ingId, 10, 'cups', 'pantry', null);
+
+    const listWithExclude = groceryService.generateList('2026-W08', { excludePantry: true });
+
+    expect(listWithExclude).toBeDefined();
+    expect(listWithExclude.groups.length).toBe(0); // Item should be removed entirely
+  } finally {
+    cleanup();
+  }
+});
+
+test('generateList skips non-recipe slot types', () => {
+  const { db, groceryService, planRepo, recipeRepo, cleanup } = setupTestDb();
+  try {
+    const ingId = createIngredient(db, 'ing-slot', 'Slot Test Ingredient', 'Produce');
+    const recipeId = createRecipe(db, recipeRepo, 'Slot Test Recipe', 4, [
+      { ingredientId: ingId, quantity: 2, unit: 'cups' },
+    ]);
+
+    const plan = planRepo.create({ week: '2026-W09', status: 'draft', notes: null });
+
+    // Add a recipe slot
+    planRepo.setMeal(plan.id, 1, 'dinner', recipeId, 4, null);
+
+    // Add a dining_out slot (manually insert to simulate)
+    const itemId = `item-${Date.now()}`;
+    db.prepare(
+      `INSERT INTO plan_items (id, plan_id, day_of_week, meal_type, recipe_id, servings, notes, slot_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(itemId, plan.id, 2, 'dinner', null, 2, 'Restaurant', 'dining_out');
+
+    const result = groceryService.generateList('2026-W09');
+    expect(result).toBeDefined();
+
+    // Should only have ingredients from the recipe slot, not from dining_out
+    expect(result.groups.length).toBe(1);
+    expect(result.groups[0].items.length).toBe(1);
   } finally {
     cleanup();
   }

@@ -1,6 +1,10 @@
 // Service exports
 
-export { RecipeService } from './recipe.service.js';
+export {
+  RecipeService,
+  type IngredientWithSubstitutions,
+  type RecipeSubstitutionSuggestions,
+} from './recipe.service.js';
 export { PlanService } from './plan.service.js';
 export {
   GroceryService,
@@ -35,3 +39,20 @@ export {
   SCORING_WEIGHTS,
   RECENT_DAYS_THRESHOLD,
 } from './suggestion.service.js';
+
+export { PrepBatchService } from './prep-batch.service.js';
+
+export {
+  SubstitutionService,
+  type SubstitutionSuggestion,
+  type GetSubstitutionSuggestionsOptions,
+} from './substitution.service.js';
+
+export {
+  PrepDayService,
+  type PrepTaskItem,
+  type PrepTask,
+  type PrepDayBatch,
+  type RecipeSummary,
+  type PrepDaySummary,
+} from './prep-day.service.js';

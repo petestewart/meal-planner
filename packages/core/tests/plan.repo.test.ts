@@ -673,3 +673,204 @@ test('list includes items for each plan', () => {
   }
 });
 
+// ============================================
+// Plan Completion Tests
+// ============================================
+
+describe('Plan Completion', () => {
+  test('completePlan marks plan as completed', () => {
+    const { repo, cleanup } = setupTestDb();
+    try {
+      const plan = repo.create({ week: '2025-W50', notes: null });
+
+      const completed = repo.completePlan(plan.id);
+
+      expect(completed).not.toBeNull();
+      expect(completed!.status).toBe('completed');
+      expect(completed!.completedAt).not.toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('completePlan returns null for already completed plan', () => {
+    const { repo, cleanup } = setupTestDb();
+    try {
+      const plan = repo.create({ week: '2025-W51', notes: null });
+      repo.completePlan(plan.id);
+
+      // Try to complete again
+      const result = repo.completePlan(plan.id);
+
+      expect(result).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('completePlan returns null for non-existent plan', () => {
+    const { repo, cleanup } = setupTestDb();
+    try {
+      const result = repo.completePlan('non-existent-id');
+      expect(result).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('getCompletedPlans returns completed plans', () => {
+    const { repo, cleanup } = setupTestDb();
+    try {
+      // Create and complete some plans
+      const plan1 = repo.create({ week: '2025-W40', notes: null });
+      const plan2 = repo.create({ week: '2025-W41', notes: null });
+      const plan3 = repo.create({ week: '2025-W42', notes: null });
+
+      repo.completePlan(plan1.id);
+      repo.completePlan(plan2.id);
+      // plan3 is not completed
+
+      const completed = repo.getCompletedPlans();
+
+      expect(completed.length).toBe(2);
+      expect(completed.every((p) => p.completedAt !== null)).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('getCompletedPlans respects limit', () => {
+    const { repo, cleanup } = setupTestDb();
+    try {
+      const plan1 = repo.create({ week: '2025-W43', notes: null });
+      const plan2 = repo.create({ week: '2025-W44', notes: null });
+      const plan3 = repo.create({ week: '2025-W45', notes: null });
+
+      repo.completePlan(plan1.id);
+      repo.completePlan(plan2.id);
+      repo.completePlan(plan3.id);
+
+      const completed = repo.getCompletedPlans(2);
+
+      expect(completed.length).toBe(2);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('markMealAsMade sets wasMade flag', () => {
+    const { db, repo, cleanup } = setupTestDb();
+    try {
+      const recipe = createTestRecipe(db, 'Test Recipe');
+      const plan = repo.create({ week: '2025-W46', notes: null });
+      repo.setMeal(plan.id, 1, 'dinner', recipe);
+
+      const updated = repo.markMealAsMade(plan.id, 1, 'dinner', true);
+
+      expect(updated).not.toBeNull();
+      expect(updated!.wasMade).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('markMealAsMade can unset wasMade flag', () => {
+    const { db, repo, cleanup } = setupTestDb();
+    try {
+      const recipe = createTestRecipe(db, 'Test Recipe');
+      const plan = repo.create({ week: '2025-W47', notes: null });
+      repo.setMeal(plan.id, 1, 'dinner', recipe);
+      repo.markMealAsMade(plan.id, 1, 'dinner', true);
+
+      const updated = repo.markMealAsMade(plan.id, 1, 'dinner', false);
+
+      expect(updated).not.toBeNull();
+      expect(updated!.wasMade).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('markMealAsMade returns null for non-existent meal', () => {
+    const { repo, cleanup } = setupTestDb();
+    try {
+      const plan = repo.create({ week: '2025-W48', notes: null });
+
+      const result = repo.markMealAsMade(plan.id, 1, 'dinner', true);
+
+      expect(result).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('getMadeMeals returns meals marked as made', () => {
+    const { db, repo, cleanup } = setupTestDb();
+    try {
+      const recipe = createTestRecipe(db, 'Test Recipe');
+      const plan = repo.create({ week: '2025-W49', notes: null });
+      repo.setMeal(plan.id, 1, 'breakfast', recipe);
+      repo.setMeal(plan.id, 1, 'lunch', recipe);
+      repo.setMeal(plan.id, 1, 'dinner', recipe);
+
+      repo.markMealAsMade(plan.id, 1, 'breakfast', true);
+      repo.markMealAsMade(plan.id, 1, 'dinner', true);
+      repo.completePlan(plan.id);
+
+      const madeMeals = repo.getMadeMeals();
+
+      expect(madeMeals.length).toBe(2);
+      expect(madeMeals.every((m) => m.wasMade)).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('getMadeMeals respects limit', () => {
+    const { db, repo, cleanup } = setupTestDb();
+    try {
+      const recipe = createTestRecipe(db, 'Test Recipe');
+      const plan = repo.create({ week: '2025-W52', notes: null });
+      repo.setMeal(plan.id, 1, 'breakfast', recipe);
+      repo.setMeal(plan.id, 1, 'lunch', recipe);
+      repo.setMeal(plan.id, 1, 'dinner', recipe);
+
+      repo.markMealAsMade(plan.id, 1, 'breakfast', true);
+      repo.markMealAsMade(plan.id, 1, 'lunch', true);
+      repo.markMealAsMade(plan.id, 1, 'dinner', true);
+      repo.completePlan(plan.id);
+
+      const madeMeals = repo.getMadeMeals(2);
+
+      expect(madeMeals.length).toBe(2);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('getRecentlyMadeRecipeIds returns recipe IDs from made meals', () => {
+    const { db, repo, cleanup } = setupTestDb();
+    try {
+      const recipe1 = createTestRecipe(db, 'Recipe 1');
+      const recipe2 = createTestRecipe(db, 'Recipe 2');
+      const plan = repo.create({ week: '2025-W53', notes: null });
+      repo.setMeal(plan.id, 1, 'breakfast', recipe1);
+      repo.setMeal(plan.id, 1, 'lunch', recipe2);
+      repo.setMeal(plan.id, 1, 'dinner', recipe1);
+
+      repo.markMealAsMade(plan.id, 1, 'breakfast', true);
+      repo.markMealAsMade(plan.id, 1, 'dinner', true);
+      // lunch not made
+      repo.completePlan(plan.id);
+
+      const recipeIds = repo.getRecentlyMadeRecipeIds(30);
+
+      expect(recipeIds.length).toBe(1); // recipe1 appears twice but should be distinct
+      expect(recipeIds).toContain(recipe1);
+      expect(recipeIds).not.toContain(recipe2);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
