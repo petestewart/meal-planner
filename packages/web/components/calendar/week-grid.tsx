@@ -10,6 +10,7 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  pointerWithin,
 } from '@dnd-kit/core';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { ChevronLeft, ChevronRight, Calendar, Plus } from 'lucide-react';
@@ -335,6 +336,7 @@ export function WeekGrid({
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
