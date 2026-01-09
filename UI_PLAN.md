@@ -174,8 +174,8 @@ packages/web/
 
 ### Ticket: U001 Initialize Next.js project in monorepo
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U001
 - **Scope:** Create packages/web with Next.js 14, configure pnpm workspace integration
 - **Acceptance Criteria:**
   - Next.js 14 with App Router initialized in packages/web
@@ -190,8 +190,8 @@ packages/web/
 
 ### Ticket: U002 Configure Tailwind CSS and shadcn/ui
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U002
 - **Scope:** Set up Tailwind CSS, install and configure shadcn/ui component library
 - **Acceptance Criteria:**
   - Tailwind CSS configured with custom theme
@@ -204,11 +204,22 @@ packages/web/
   - Dark mode toggle works
 - **Notes:**
   - Use shadcn/ui CLI to add components as needed
+  - Agent-U002 implementation notes:
+    - Installed Tailwind CSS 3.4.x, PostCSS, autoprefixer, tailwindcss-animate
+    - Configured tailwind.config.js with custom theme colors using CSS variables
+    - Created globals.css with Tailwind directives and light/dark mode CSS variables
+    - Initialized shadcn/ui with components.json (new-york style, CSS variables)
+    - Added components: Button, Card, Input, Dialog
+    - Created lib/utils.ts with cn() utility function
+    - Installed next-themes, created ThemeProvider component
+    - Updated layout.tsx with ThemeProvider (attribute="class", enableSystem)
+    - Updated page.tsx with demo showcasing all button variants, cards, input, and theme toggle
+    - Build succeeds, TypeScript types check, dev server runs on port 3001
 
 ### Ticket: U003 Create API client and TanStack Query setup
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U003
 - **Scope:** Create typed API client wrapper, configure TanStack Query provider
 - **Acceptance Criteria:**
   - API client with typed methods for all backend endpoints
@@ -224,8 +235,8 @@ packages/web/
 
 ### Ticket: U004 Implement app layout and navigation
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U004
 - **Scope:** Create responsive layout with header, navigation, and mobile bottom nav
 - **Acceptance Criteria:**
   - Header with app title and settings access
@@ -242,8 +253,8 @@ packages/web/
 
 ### Ticket: U005 Build dashboard/home page
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U005
 - **Scope:** Create dashboard with week overview, quick actions, and alerts
 - **Acceptance Criteria:**
   - Mini calendar showing current week's meals
@@ -256,11 +267,18 @@ packages/web/
   - Quick actions navigate to correct pages
   - Expiring items show when pantry has items expiring within 7 days
 - **Notes:**
+  - Implemented "This Week at a Glance" mini calendar with current week meals
+  - Quick action buttons styled as Button components: Plan Week, Add Recipe, Grocery List
+  - Today and tomorrow highlighted with badges and accent styling
+  - Expiring pantry items section ready (placeholder until pantry API exists)
+  - Recently Added recipes section shows latest 4 recipes with cook times
+  - Uses usePlan, useRecipes, usePreferences hooks for data
+  - Kept navigation cards at bottom for full page access
 
 ### Ticket: U006 Build weekly calendar view
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U006
 - **Scope:** Create interactive 7-day meal calendar grid with recipe slots
 - **Acceptance Criteria:**
   - 7-day grid view (Mon-Sun)
@@ -278,8 +296,8 @@ packages/web/
 
 ### Ticket: U007 Implement drag-and-drop meal assignment
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U007
 - **Scope:** Add drag-and-drop support for moving recipes between meal slots
 - **Acceptance Criteria:**
   - Drag recipe card from one slot to another
@@ -296,8 +314,8 @@ packages/web/
 
 ### Ticket: U008 Build recipe selector modal
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U008
 - **Scope:** Create modal for selecting a recipe to assign to a meal slot
 - **Acceptance Criteria:**
   - Opens when clicking empty slot or "change" on filled slot
@@ -315,8 +333,8 @@ packages/web/
 
 ### Ticket: U009 Build recipe library page
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U009
 - **Scope:** Create browsable recipe library with search, filters, and grid view
 - **Acceptance Criteria:**
   - Grid of recipe cards (image, title, time, cuisine)
@@ -333,8 +351,8 @@ packages/web/
 
 ### Ticket: U010 Build recipe detail page
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U010
 - **Scope:** Create recipe detail view with ingredients, instructions, and actions
 - **Acceptance Criteria:**
   - Hero image (or placeholder) with title overlay
@@ -353,8 +371,8 @@ packages/web/
 
 ### Ticket: U011 Build recipe import flow
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U011
 - **Scope:** Create UI for importing recipes from URLs
 - **Acceptance Criteria:**
   - URL input field with paste support
@@ -372,8 +390,8 @@ packages/web/
 
 ### Ticket: U012 Build recipe form (add/edit)
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U012
 - **Scope:** Create form for manually adding or editing recipes
 - **Acceptance Criteria:**
   - Fields: title, description, servings, prep/cook time, cuisine
@@ -392,8 +410,8 @@ packages/web/
 
 ### Ticket: U013 Build grocery list page
 - **Priority:** P0
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U013
 - **Scope:** Create grocery list view with categorized items and state tracking
 - **Acceptance Criteria:**
   - Items grouped by store section (Produce, Dairy, etc.)
@@ -410,8 +428,8 @@ packages/web/
 
 ### Ticket: U014 Implement shopping mode for grocery list
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U014
 - **Scope:** Create simplified shopping mode optimized for in-store use
 - **Acceptance Criteria:**
   - Toggle to enter shopping mode
@@ -429,8 +447,8 @@ packages/web/
 
 ### Ticket: U015 Build pantry management page
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U015
 - **Scope:** Create pantry inventory management interface
 - **Acceptance Criteria:**
   - List of pantry items with quantity, unit, location
@@ -448,8 +466,8 @@ packages/web/
 
 ### Ticket: U016 Implement pantry-grocery integration
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U016
 - **Scope:** Connect pantry to grocery list for auto-checking
 - **Acceptance Criteria:**
   - "Check Pantry" button on grocery list
@@ -465,8 +483,8 @@ packages/web/
 
 ### Ticket: U017 Build settings/preferences page
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U017
 - **Scope:** Create settings page for user preferences
 - **Acceptance Criteria:**
   - Household size setting
@@ -482,12 +500,12 @@ packages/web/
   - Change household size, verify saved to API
   - Toggle dietary restriction, verify persisted
   - Settings survive page reload
-- **Notes:**
+- **Notes:** Implementation complete. Created settings page with all UI elements: household size (number input 1-12), default servings (number input 1-12), meal type checkboxes (breakfast/lunch/dinner/snacks), dietary restrictions checkboxes (8 options), disliked ingredients tag input, favorite cuisines checkboxes (10 options), max prep time (number input in minutes), prep day selector (dropdown), and dark mode toggle using next-themes. Created helper components: SettingsSection.tsx and TagInput.tsx. Uses existing usePreferences/useUpdatePreferences hooks with debounced auto-save. Build passes.
 
 ### Ticket: U018 Implement offline support with service worker
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U018
 - **Scope:** Add PWA capabilities with offline grocery list support
 - **Acceptance Criteria:**
   - Service worker caches app shell
@@ -505,8 +523,8 @@ packages/web/
 
 ### Ticket: U019 Implement meal slot special states
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U019
 - **Scope:** Support "Dining Out", "Skip", and "Leftovers" meal slot states
 - **Acceptance Criteria:**
   - Recipe selector includes "Dining Out" and "Skip" options
@@ -577,8 +595,8 @@ packages/web/
 
 ### Ticket: U023 Add loading states and skeletons
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U023
 - **Scope:** Implement consistent loading states across all views
 - **Acceptance Criteria:**
   - Skeleton loaders for recipe cards, calendar slots
@@ -594,8 +612,8 @@ packages/web/
 
 ### Ticket: U024 Implement responsive design polish
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U024
 - **Scope:** Ensure all views work well on mobile through desktop
 - **Acceptance Criteria:**
   - All views usable at 375px width
@@ -612,8 +630,8 @@ packages/web/
 
 ### Ticket: U025 Add keyboard navigation and accessibility
 - **Priority:** P1
-- **Status:** Todo
-- **Owner:** Unassigned
+- **Status:** Done
+- **Owner:** Agent-U025
 - **Scope:** Ensure WCAG 2.1 AA compliance and keyboard navigation
 - **Acceptance Criteria:**
   - All interactive elements focusable via Tab
@@ -643,6 +661,6 @@ packages/web/
 
 > _New issues must be appended here with a timestamp and brief context._
 
-<!-- Example:
-- **2026-01-04 14:30** - Issue description and context
--->
+- **2026-01-05 QA** - CORS configuration in API server (packages/api/src/server.ts) was missing port 3001 for Next.js dev server. Fixed by adding `http://localhost:3001` and `http://127.0.0.1:3001` to allowed origins.
+- **2026-01-05 QA** - Runtime error in grocery-item.tsx (line 72): "Cannot read properties of undefined (reading 'length')" when `item.recipeIds` is undefined. Fixed by adding null check before accessing `.length`.
+- **2026-01-05 QA** - HTML entities not decoded in recipe titles (e.g., `World&#39;s Best` instead of `World's Best`). Needs investigation - likely an issue with how recipe data is stored or displayed.

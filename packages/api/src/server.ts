@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import { getDb, migrate, getDefaultMigrationsDir } from '@meals/core';
 import { errorHandler } from './middleware/error-handler.js';
 import { ErrorCodes, errorResponse, successResponse } from './types.js';
-import { recipeRoutes, planRoutes, groceryRoutes, preferenceRoutes, substitutionRoutes, ingredientRoutes } from './routes/index.js';
+import { recipeRoutes, planRoutes, groceryRoutes, preferenceRoutes, pantryRoutes, substitutionRoutes, ingredientRoutes } from './routes/index.js';
 
 /**
  * Health check response type
@@ -26,8 +26,10 @@ export async function buildServer() {
   await server.register(cors, {
     origin: [
       'http://localhost:3000',
+      'http://localhost:3001', // Next.js dev server port
       'http://localhost:5173', // Vite default port
       'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
       'http://127.0.0.1:5173',
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -58,6 +60,7 @@ export async function buildServer() {
   await server.register(planRoutes);
   await server.register(groceryRoutes);
   await server.register(preferenceRoutes);
+  await server.register(pantryRoutes);
   await server.register(substitutionRoutes);
   await server.register(ingredientRoutes);
 

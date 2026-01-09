@@ -1,0 +1,15 @@
+# dependencies
+node_modules
+
+# Next.js build output
+.next/
+out/
+
+# PWA service worker (generated during build)
+public/sw.js
+public/workbox-*.js
+public/swe-worker-*.js
+
+# misc
+*.log
+.DS_Store
