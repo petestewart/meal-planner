@@ -11,6 +11,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { ChevronLeft, ChevronRight, Calendar, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -629,7 +630,7 @@ export function WeekGrid({
       )}
 
       {/* Drag Overlay - shows the dragged item */}
-      <DragOverlay>
+      <DragOverlay modifiers={[snapCenterToCursor]}>
         {activeDragData?.recipe ? (
           <div className="opacity-90 shadow-xl">
             <RecipeCard
